@@ -1,6 +1,9 @@
 #pragma once
 #include <stdint.h>
 
-void imu_init(void);
-void imu_tick(void);            // call from loop(), handles auto-rotation
-uint8_t imu_get_rotation(void); // current rotation 0-3
+// IMU auto-rotation was dropped for the Attaky Core port (fixed landscape,
+// setRotation(3)). QMI8658A is present on the bus but unused here. These
+// remain as no-ops so callers/includes stay valid.
+void    imu_init(void);
+void    imu_tick(void);
+uint8_t imu_get_rotation(void);  // always 0 (fixed orientation)
