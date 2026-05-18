@@ -1,17 +1,20 @@
 #!/bin/bash
-# Build and flash Clawdmeter firmware on macOS.
+# Build and flash firmware on macOS (Attaky Core_ESP32_1.0).
+# The Core uses an external CH340X USB-UART, which enumerates as
+# /dev/cu.usbserial-* (NOT /dev/cu.usbmodem*).
 # Usage:
-#   ./flash-mac.sh                       # auto-detect /dev/cu.usbmodem*
-#   ./flash-mac.sh /dev/cu.usbmodem1101  # explicit USB serial port
+#   ./flash-mac.sh                       # auto-detect /dev/cu.usbserial-*
+#   ./flash-mac.sh /dev/cu.usbserial-2120  # explicit CH340X serial port
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PORT="$1"
 
 if [ -z "$PORT" ]; then
-    PORT=$(ls /dev/cu.usbmodem* 2>/dev/null | head -1)
+    PORT=$(ls /dev/cu.usbserial-* 2>/dev/null | head -1)
     if [ -z "$PORT" ]; then
-        echo "Error: no /dev/cu.usbmodem* device found. Plug in via USB-C."
+        echo "Error: no /dev/cu.usbserial-* device found. Plug in via USB-C"
+        echo "and check the CH340 driver is installed."
         exit 1
     fi
 fi
@@ -22,7 +25,7 @@ if ! command -v pio >/dev/null; then
     exit 1
 fi
 
-echo "=== Flashing Clawdmeter ==="
+echo "=== Flashing firmware (Attaky Core) ==="
 echo "Port: $PORT"
 echo ""
 
