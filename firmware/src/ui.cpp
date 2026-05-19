@@ -400,8 +400,8 @@ void ui_init(void) {
         lv_obj_add_event_cb(splash_get_root(), global_click_cb, LV_EVENT_CLICKED, NULL);
     }
 
-    // Logo: 36x36 brand mark (regenerated small for 320x240)
-    // top-left; hidden only on the splash so the animation is clean.
+    // Logo: 36x36 brand mark regenerated for 320x240, top-left;
+    // hidden only on the splash so the animation is clean.
     logo_img = lv_image_create(scr);
     lv_image_set_src(logo_img, &logo_dsc);
     lv_obj_set_pos(logo_img, MARGIN, TITLE_Y);

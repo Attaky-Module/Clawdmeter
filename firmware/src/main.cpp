@@ -26,8 +26,9 @@ static uint16_t touch_y = 0;
 // Map FT6636 panel-native coords (nx:0..239, ny:0..319) to LVGL landscape
 // space (0..LCD_WIDTH-1, 0..LCD_HEIGHT-1) for setRotation(3) + the panel's
 // 180-degree physical mount.
-// TUNE: verify on real hardware (tap the 4 corners, watch serial) and flip
-// the axes/inversions here if a corner lands wrong.
+// Hardware-tested: the 4 corners pass for setRotation(3) + the
+// panel's 180-degree mount; no recalibration needed. If the panel changes,
+// re-verify by tapping the 4 corners on serial and flip axes/inversions here.
 static void map_touch(uint16_t nx, uint16_t ny, uint16_t *lx, uint16_t *ly) {
     uint16_t x = (uint16_t)(LCD_NATIVE_H - 1 - ny);  // 0..319 -> 0..LCD_WIDTH-1
     uint16_t y = nx;                                 // 0..239 -> 0..LCD_HEIGHT-1
