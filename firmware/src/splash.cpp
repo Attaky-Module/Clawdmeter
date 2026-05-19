@@ -2,25 +2,26 @@
 #include "splash_animations.h"
 #include "theme.h"
 #include "usage_rate.h"
+#include "display_cfg.h"
 #include <Arduino.h>
 #include <string.h>
 #include <esp_heap_caps.h>
 
-// 20x20 grid scaled 24x to fill 480x480
+// 20x20 sprite grid scaled 12x → 240x240, centered in the 320x240 screen.
 #define GRID         20
-#define CELL         24
+#define CELL         12
 #define CANVAS_W     (GRID * CELL)
 #define CANVAS_H     (GRID * CELL)
 
 // Background fallback when palette is missing
 #define COL_EMPTY    0x0000  // true black (matches THEME_BG)
 
-LV_FONT_DECLARE(font_styrene_28);
+LV_FONT_DECLARE(font_styrene_16);
 
 static lv_obj_t *splash_container = NULL;
 static lv_obj_t *canvas = NULL;
 static lv_obj_t *label_status = NULL;     // shown only when no animations loaded
-static uint16_t *canvas_buf = NULL;        // 480x480 RGB565 (PSRAM)
+static uint16_t *canvas_buf = NULL;        // 240x240 RGB565 (PSRAM)
 
 static uint16_t cur_anim = 0;
 static uint16_t cur_frame = 0;
@@ -99,7 +100,7 @@ void splash_init(lv_obj_t *parent) {
     }
 
     splash_container = lv_obj_create(parent);
-    lv_obj_set_size(splash_container, 480, 480);
+    lv_obj_set_size(splash_container, LCD_WIDTH, LCD_HEIGHT);
     lv_obj_set_pos(splash_container, 0, 0);
     lv_obj_set_style_bg_color(splash_container, THEME_BG, 0);
     lv_obj_set_style_bg_opa(splash_container, LV_OPA_COVER, 0);
@@ -117,7 +118,7 @@ void splash_init(lv_obj_t *parent) {
         "no animations loaded\n\n"
         "run tools/scrape_claudepix.js\n"
         "then tools/convert_to_c.js");
-    lv_obj_set_style_text_font(label_status, &font_styrene_28, 0);
+    lv_obj_set_style_text_font(label_status, &font_styrene_16, 0);
     lv_obj_set_style_text_color(label_status, lv_color_hex(0xb0aea5), 0);
     lv_obj_set_style_text_align(label_status, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_center(label_status);
