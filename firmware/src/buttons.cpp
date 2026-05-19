@@ -14,11 +14,11 @@ struct Btn {
 };
 
 // User-facing button → AW9523_B (@0x59) Port0 bit.
-// The host pinmap labels P01=RIGHT / P03=LEFT from the board-
-// internal view, which is MIRRORED vs how the user faces the device.
-// Hardware-verified: the physically-left key is
-// P01 and the physically-right key is P03. UP/DOWN are not affected by a
-// left/right mirror. the board pin labelling is left unchanged here.
+// Board-internal pin labelling has P01=RIGHT / P03=LEFT, MIRRORED vs
+// how the user physically faces the device: hardware-verified, the
+// physically-left key is P01 and physically-right is P03 (UP/DOWN
+// unaffected). The cross-mapping below is the intentional,
+// verified-correct compensation; board pin labelling left as-is.
 static Btn btns[BTN_HID_COUNT] = {
     [BTN_UP]     = { BTN_BIT_UP,     false, false, 0 },  // P04
     [BTN_DOWN]   = { BTN_BIT_DOWN,   false, false, 0 },  // P00
