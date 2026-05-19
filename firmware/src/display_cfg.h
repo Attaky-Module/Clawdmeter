@@ -53,5 +53,9 @@
 // ---- AW9523_A (@0x58) Port0: touch INT on bit 4 ----
 #define AWA_P0_TOUCH_INT   4
 
+// ---- BOOT_BTN: direct ESP32 GPIO (IO38), external pullup, LOW = pressed.
+//      Used as the UI-nav key (cycle screen / next splash animation).
+#define BOOT_BTN_PIN       38
+
 // ---- Global hardware object (defined in main.cpp) ----
 extern TFT_eSPI tft;

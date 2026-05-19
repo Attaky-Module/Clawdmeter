@@ -153,6 +153,7 @@ static lv_obj_t* make_panel(lv_obj_t* parent, int x, int y, int w, int h) {
     lv_obj_set_style_pad_top(panel, 6, 0);
     lv_obj_set_style_pad_bottom(panel, 6, 0);
     lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(panel, LV_SCROLLBAR_MODE_OFF);
     // Bubble click events up to the screen / usage_container so a tap anywhere
     // on the panel fires the global click handler.
     lv_obj_add_flag(panel, LV_OBJ_FLAG_EVENT_BUBBLE);
@@ -257,6 +258,7 @@ static void init_usage_screen(lv_obj_t* scr) {
     lv_obj_set_style_border_width(usage_container, 0, 0);
     lv_obj_set_style_pad_all(usage_container, 0, 0);
     lv_obj_clear_flag(usage_container, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(usage_container, LV_SCROLLBAR_MODE_OFF);
     lv_obj_add_event_cb(usage_container, global_click_cb, LV_EVENT_CLICKED, NULL);
 
     lbl_title = lv_label_create(usage_container);
@@ -289,6 +291,7 @@ static void init_bluetooth_screen(lv_obj_t* scr) {
     lv_obj_set_style_border_width(ble_container, 0, 0);
     lv_obj_set_style_pad_all(ble_container, 0, 0);
     lv_obj_clear_flag(ble_container, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(ble_container, LV_SCROLLBAR_MODE_OFF);
 
     // Title
     lv_obj_t* lbl_ble_title = lv_label_create(ble_container);
@@ -339,6 +342,7 @@ static void init_bluetooth_screen(lv_obj_t* scr) {
     lv_obj_set_flex_flow(reset_zone, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(reset_zone, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_clear_flag(reset_zone, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(reset_zone, LV_SCROLLBAR_MODE_OFF);
     lv_obj_add_event_cb(reset_zone, ble_reset_click_cb, LV_EVENT_CLICKED, NULL);
 
     static lv_image_dsc_t icon_trash_dsc;
@@ -374,6 +378,10 @@ void ui_init(void) {
     lv_obj_t* scr = lv_screen_active();
     lv_obj_set_style_bg_color(scr, COL_BG, 0);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
+    // The screen root is scrollable by default; a child grazing the edge
+    // makes LVGL show a scrollbar. Disable scroll + scrollbar on the root.
+    lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_clear_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
 
     // Logo (shared, always visible, on top of all containers)
     // Logo is RGB565A8 (planar: w*h RGB565 then w*h alpha) so it composites
@@ -401,7 +409,11 @@ void ui_init(void) {
     // Battery indicator on top of all containers (upper-right)
     battery_img = lv_image_create(scr);
     lv_image_set_src(battery_img, &battery_dscs[0]);
-    lv_obj_set_pos(battery_img, SCR_W - 48 - MARGIN, TITLE_Y);
+    // Shrink the 48px icon to ~28px and anchor top-left so it sits tight
+    // in the upper-right corner (user: smaller + moved up).
+    lv_image_set_pivot(battery_img, 0, 0);
+    lv_image_set_scale(battery_img, 150);  // 150/256 ≈ 0.59 → ~28px
+    lv_obj_set_pos(battery_img, SCR_W - 28 - MARGIN, 2);
 }
 
 void ui_update(const UsageData* data) {

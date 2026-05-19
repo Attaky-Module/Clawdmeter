@@ -214,27 +214,41 @@ void loop() {
     buttons_tick();
     splash_tick();
 
-    // Three-button input (global, screen-independent):
-    //   LEFT   → Space (voice-mode push-to-talk; press & release tracked)
-    //   RIGHT  → Shift+Tab (Claude Code mode toggle)
-    //   SELECT → cycle screens; on splash, cycle animations
+    // HID keyboard input. One key held at a time (the BLE HID report model
+    // here carries a single keycode+modifier). Per btn_id_t order:
+    //   UP/DOWN/LEFT/RIGHT → arrow keys, SELECT → Enter,
+    //   L1 → Shift+Tab, R2 → Space.
+    // BOOT_BTN does UI nav (cycle screen / next splash anim) — not HID.
     {
-        static bool left_was = false, right_was = false;
-        bool left_now  = buttons_left_down();
-        bool right_now = buttons_right_down();
+        struct HidMap { uint8_t key; uint8_t mod; };
+        static const HidMap hid[BTN_HID_COUNT] = {
+            [BTN_UP]     = { 0x52, 0x00 },  // Up Arrow
+            [BTN_DOWN]   = { 0x51, 0x00 },  // Down Arrow
+            [BTN_LEFT]   = { 0x50, 0x00 },  // Left Arrow
+            [BTN_RIGHT]  = { 0x4F, 0x00 },  // Right Arrow
+            [BTN_SELECT] = { 0x28, 0x00 },  // Enter / Return
+            [BTN_L1]     = { 0x2B, 0x02 },  // Tab + LEFT_SHIFT
+            [BTN_R2]     = { 0x2C, 0x00 },  // Space
+        };
+        static int held = -1;  // index of the currently-held HID button
 
-        if (left_now != left_was) {
-            if (left_now) ble_keyboard_press(0x2C, 0);     // HID Space, no mods
-            else          ble_keyboard_release();
-            left_was = left_now;
+        if (held >= 0) {
+            if (!buttons_down((btn_id_t)held)) {
+                ble_keyboard_release();
+                held = -1;
+            }
         }
-        if (right_now != right_was) {
-            if (right_now) ble_keyboard_press(0x2B, 0x02);  // HID Tab + LEFT_SHIFT
-            else           ble_keyboard_release();
-            right_was = right_now;
+        if (held < 0) {
+            for (int i = 0; i < BTN_HID_COUNT; i++) {
+                if (buttons_down((btn_id_t)i)) {
+                    ble_keyboard_press(hid[i].key, hid[i].mod);
+                    held = i;
+                    break;
+                }
+            }
         }
 
-        if (buttons_select_pressed()) {
+        if (buttons_boot_pressed()) {
             if (ui_get_current_screen() == SCREEN_SPLASH) splash_next();
             else                                          ui_cycle_screen();
         }

@@ -1,16 +1,31 @@
 #pragma once
 #include <stdbool.h>
 
-// Physical buttons on AW9523_B (@0x59) Port0, active LOW, polled + debounced.
-// Mapping for this port (hardware-verified):
-//   LEFT   → Space      (Claude Code voice-mode push-to-talk; level-tracked)
-//   RIGHT  → Shift+Tab  (Claude Code mode toggle; level-tracked)
-//   SELECT → cycle screen / next splash animation (one-shot edge)
-// POWER_BTN is a hardware power toggle and is intentionally not exposed.
+// Input map (hardware-verified):
+//   D-pad UP/DOWN/LEFT/RIGHT → keyboard arrow keys (HID, level-tracked)
+//   SELECT                   → Enter / confirm (HID)
+//   BTN_L1                   → Shift+Tab (HID)
+//   BTN_R2                   → Space (HID)
+//   BOOT_BTN (IO38)          → UI nav: cycle screen / next splash anim
+//   POWER_BTN                → hardware power toggle, not exposed
+//
+// D-pad + SELECT + L1 + R2 are on AW9523_B (@0x59) Port0, active LOW.
+// Physical LEFT/RIGHT are mirrored vs the board-internal P01/P03 labels (board-
+// internal view); the mirror is resolved inside buttons.cpp.
 
-void buttons_init(void);
-void buttons_tick(void);          // call once per loop()
+typedef enum {
+    BTN_UP = 0,
+    BTN_DOWN,
+    BTN_LEFT,
+    BTN_RIGHT,
+    BTN_SELECT,
+    BTN_L1,
+    BTN_R2,
+    BTN_HID_COUNT
+} btn_id_t;
 
-bool buttons_left_down(void);     // debounced level
-bool buttons_right_down(void);    // debounced level
-bool buttons_select_pressed(void);// true once per press (consumes the edge)
+void buttons_init(void);              // sets up the BOOT_BTN GPIO
+void buttons_tick(void);              // call once per loop()
+
+bool buttons_down(btn_id_t b);        // debounced level for a HID button
+bool buttons_boot_pressed(void);      // BOOT_BTN one-shot (consumes edge)
