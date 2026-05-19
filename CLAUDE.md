@@ -1,62 +1,90 @@
 # Project context
 
-ESP32-S3 firmware for a desk-side Claude Code usage monitor on a **Waveshare ESP32-S3-Touch-AMOLED-2.16** board (480×480 square AMOLED). Connects to a host daemon over BLE; daemon polls Anthropic API for usage data.
+ESP32-S3 firmware for a desk-side Claude Code usage monitor. The board
+is **Attaky Core_ESP32_1.0** (+ **Power_Standard-Cell_1.0** battery),
+driving an **ST7789 240x320 SPI** display used landscape via
+`setRotation(3)` (logical 320x240). It connects to a host daemon over
+BLE; the daemon polls the Anthropic API for usage data.
 
-This file is for future Claude Code sessions to bootstrap quickly. Read this first.
+This file is for future Claude Code sessions to bootstrap quickly. Read
+this first.
 
-## Hardware (critical pins)
-
-- Display: **CO5300** AMOLED via QSPI (CS=12, SCLK=38, SDIO0..3=4..7, RST=2)
-- Touch: **CST9220** via I2C (SDA=15, SCL=14, INT=11, addr=0x5A)
-- PMU: **AXP2101** on same I2C bus (addr=0x34) — battery, USB VBUS, PWR button IRQ
-- IMU: **QMI8658** on same I2C bus (addr=0x6B) — accelerometer for auto-rotation
-- Buttons: GPIO 0 (left → Space/voice-mode), GPIO 18 (right → Shift+Tab/mode-toggle), AXP PKEY (middle → cycle screens; on splash → cycle animations)
+> **Hardware authority.** This firmware was ported from an earlier
+> Waveshare ESP32-S3-Touch-AMOLED-2.16 prototype to the Attaky Core
+> board, so older AMOLED/CO5300-era assumptions no longer hold. The
+> authoritative, current hardware truth lives in the repo itself:
+> - Pin map / peripherals / display + touch parts:
+>   `firmware/src/display_cfg.h` (the values the code compiles against —
+>   never transcribe pin numbers into this file; they drift).
+> - Board / platform / build flags: `firmware/platformio.ini`.
+>
+> Any hardware/pin/flash detail below is intentionally generic — defer
+> to those two in-repo files for specifics, and read the relevant
+> `firmware/src/` source before changing display, touch, power, or
+> input code.
 
 ## Architecture
 
 ```text
-main.cpp        — setup(), loop(), button polling (left→Space, right→Shift+Tab, mid→cycle), rotation flash
-display_cfg.h   — pin defines, extern object decls
+main.cpp        — setup(), loop(), button polling, display flush
+display_cfg.h   — authoritative pin defines + extern object decls
 ui.{h,cpp}      — 3-screen UI (splash, usage, bluetooth); splash is touch-toggled, usage↔bluetooth via mid button
-splash.{h,cpp}  — 20×20 pixel-art animation engine, 24× upscale to 480×480
-imu.{h,cpp}     — accelerometer-driven rotation tracker (returns 0..3)
-power.{h,cpp}   — AXP2101 wrapper (battery %, charging, VBUS, PWR button)
+splash.{h,cpp}  — 20×20 pixel-art animation engine, upscaled to the panel
+buttons.cpp     — physical button handling (pins in display_cfg.h)
+power.{h,cpp}   — battery fuel-gauge wrapper (gauge part / address in display_cfg.h)
 touch.{h,cpp}   — minimal tap detector → ui_toggle_splash() (Usage/Splash) or ble_clear_bonds() (BT reset zone)
 ble.{h,cpp}     — NimBLE peripheral: custom data service + HID keyboard
 data.h          — UsageData struct
 icons.h         — icon arrays. Battery (5×) are RGB565A8 with alpha; rest are raw RGB565.
-logo.h          — 80×80 RGB565 logo
+logo.h          — RGB565 logo
 font_*.c        — pre-compiled LVGL 9 bitmap fonts (Tiempos 56, Styrene 48/28/24/20, Mono 32)
 splash_animations.h — generated, do not hand-edit
 ```
 
+Hardware specifics for any of the above (display controller, fuel
+gauge, touch part, button pins, panel size/orientation) live in
+`firmware/src/display_cfg.h` and `firmware/platformio.ini` — do not
+restate them here.
+
 ## Build / flash
 
 ```bash
-pio run -d firmware                                       # build
-pio run -d firmware -t upload --upload-port /dev/ttyACM0  # flash (binary path uses USB JTAG)
+pio run -d firmware                 # build
+pio run -d firmware -t upload       # flash (pio auto-detects the serial port)
 ```
 
 `/home/hermann/.platformio/penv/bin/pio` if `pio` isn't on PATH.
 
-Device shows up as `/dev/ttyACM0` (Espressif USB JTAG/serial debug unit). No boot-mode gymnastics needed — direct flash works.
+No fixed upload port is pinned in `firmware/platformio.ini` — pio
+auto-detects the device. The board exposes serial over an external
+USB-UART (no native USB); confirm the port against the connected
+device if auto-detection picks the wrong one.
 
 ## QA your own UI changes — don't ask the user
 
-The firmware ships a `screenshot` serial command that dumps the LVGL framebuffer over `/dev/ttyACM0`. `./screenshot.sh out.png /dev/ttyACM0` captures a 480×480 PNG. **Use this on every UI iteration** — Read the PNG with the Read tool, verify the change visually, iterate.
+The firmware ships a `screenshot` serial command that dumps the LVGL
+framebuffer; `./screenshot.sh out.png <serial-port>` captures a PNG at
+the panel's native resolution. **Use this on every UI iteration** —
+Read the PNG with the Read tool, verify the change visually, iterate.
 
-The boot screen is `SCREEN_SPLASH` and only advances on a physical button press, so a fresh flash will sit on the splash. To screenshot the screen you're actually editing without asking the user to press a button, **temporarily change the default boot screen** in `main.cpp` (search for `ui_show_screen(SCREEN_SPLASH);`) to `SCREEN_USAGE` / `SCREEN_CONTROLLER` / `SCREEN_BLUETOOTH`, do your iteration, then revert before committing.
+The boot screen is `SCREEN_SPLASH` and only advances on a physical
+button press, so a fresh flash sits on the splash. To screenshot the
+screen you're editing without asking the user to press a button,
+**temporarily change the default boot screen** in `main.cpp` (search
+for `ui_show_screen(SCREEN_SPLASH);`) to the target screen, iterate,
+then revert before committing.
 
-## Critical gotchas
+## Porting note (replaces the old board-specific gotcha list)
 
-1. **CO5300 cannot rotate.** Its MADCTL only supports axis flips, not column/row exchange. Rotation is done by **CPU pixel remapping in `my_flush_cb`** in main.cpp. We use **PARTIAL render mode with strip rotation** (small 480×40 strips, fast). On rotation change → AMOLED brightness flash → force redraw.
-2. **OPI PSRAM** required: `board_build.arduino.memory_type = qio_opi` in platformio.ini. Without this, `MALLOC_CAP_SPIRAM` returns NULL and the screen is black.
-3. **pioarduino platform required.** GFX Library for Arduino needs Arduino Core 3.x (`esp32-hal-periman.h`), not the 2.x that standard `espressif32` ships. We pin `pioarduino/platform-espressif32` 55.03.38-1.
-4. **LVGL 9 font patching.** `lv_font_conv` outputs LVGL 8 format. Must remove `#if LVGL_VERSION_MAJOR >= 8` guards, drop `.cache` field, add `.release_glyph`, `.kerning`, `.static_bitmap`, `.fallback`, `.user_data`. Without patching, fonts render invisible.
-5. **Touch reading must be centralized.** CST9220's `getPoint()` does a full I2C transaction. Calling it from multiple places consumed each other's data and broke input. `touch_read()` is called once per loop in main.cpp; both LVGL `my_touch_cb` and `touch.cpp` read from shared `touch_pressed/touch_x/touch_y` state.
-6. **CO5300 needs even-aligned flush regions.** `rounder_cb` enforces this.
-7. **Touch `setSwapXY(true)` and `setMirrorXY(true, false)`** are the empirically-correct values for default rotation 0. IMU rotation logic doesn't change touch mapping (it does CPU-side rotation of the rendered pixels, so LVGL still thinks the display is portrait at 0°).
-8. **LVGL RGB565A8 is planar.** `w*h` RGB565 pixels followed by `w*h` alpha bytes; `data_size = w*h*3`, `stride = w*2`. Use `init_icon_dsc_rgb565a8()` for icons that overlap non-uniform backgrounds (e.g. battery over splash). Lucide source PNGs are black-on-transparent — converter must tint to white or icons render invisible. See `tools/png_to_lvgl.js`.
+Several constraints from the original Waveshare AMOLED prototype no
+longer apply — this port uses **TFT_eSPI + ST7789**, not the old
+AMOLED/GFX stack, so the previous CO5300/CST9220/OPI-PSRAM gotchas are
+removed rather than carried forward stale. Before changing display,
+touch, PSRAM, or font code, read the relevant source under
+`firmware/src/` and the build flags in `firmware/platformio.ini`;
+several non-obvious port constraints are encoded there (e.g. TFT_eSPI
+pin config is compiled in via `platformio.ini` build flags, not a
+`User_Setup.h`).
 
 ## Icons
 
@@ -78,23 +106,14 @@ Each animation has a per-animation 10-color RGB565 palette. Cell values 0..9 ind
 
 See `~/.claude/projects/.../memory/` files for persistent context (user is an embedded-beginner senior dev, brand-conscious, prefers iterative UI refinement, dislikes me authoring my own art when third-party assets are intended). Always read those memory files at session start.
 
-## Recent session highlights
-
-- Migrated from Panlee SC01 Plus (480×320 IPS) to Waveshare 2.16" AMOLED (480×480 square). Full hardware/library swap.
-- Added IMU auto-rotation, battery indicator, USB-state-aware screen switching.
-- Added splash screen with scraped pixel-art animations and 3-button physical input layout.
-- Fonts and icons re-scaled ~1.9× for the higher-DPI panel.
-- All UI margins widened to 20px to clear the rounded display corners.
-- Battery icons converted to RGB565A8 alpha so they blend cleanly over the splash animations.
-
 ## Daemon / host side
 
 Bash daemon (`daemon/claude-usage-daemon.sh`) reads OAuth token, polls Anthropic API, sends JSON over BLE GATT. Run with `systemctl --user start claude-usage-daemon`. The unit file's `ExecStart` is the absolute path to the script — repoint it when switching between the worktree and the main checkout.
 
 **Discovery & resilience:**
 
-- Connects by name (`"Claude Controller"`) on first run, caches resolved MAC at `~/.config/claude-usage-monitor/ble-address`. ESP32 BLE addresses are factory-burned per-chip, so swapping any board invalidates the cache.
-- On connect failure: cache is dropped AND device is removed from bluez (`bluetoothctl remove`) so the next scan won't re-pick a dead MAC. Multi-candidate scans pick `head -1` and let the failure cycle converge.
+- Connects by name (`"Claude Controller"`), then caches the resolved address at `~/.config/claude-usage-monitor/ble-address`. The device's BLE address is NOT a stable factory MAC — NimBLE uses a random address that changes across boots, so any cached address invalidates on reboot or board swap. Name-based connect still works; the cache is only a fast-path.
+- On connect failure: cache is dropped AND device is removed from bluez (`bluetoothctl remove`) so the next scan won't re-pick a dead address. Multi-candidate scans pick `head -1` and let the failure cycle converge.
 - `POLL_INTERVAL=60`, `TICK=5`. Inner loop wakes every 5s to detect disconnects fast; polls Anthropic when 60s elapsed OR when ESP fires a refresh request.
 
 **GATT characteristics on service `4c41555a-...0001`:**

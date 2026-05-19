@@ -5,8 +5,7 @@
 
 // ============================================================================
 // Attaky Core_ESP32_1.0 (+ Power_Standard-Cell_1.0) hardware map.
-// Verified against the hardware spec: the Core_ESP32_1.0 module spec,
-// Power_Standard-Cell_1.0 v1.1, the host pinmap.
+// Pin assignments verified against the authoritative Attaky hardware spec.
 // ============================================================================
 
 // ---- Display: ST7789 240x320 over SPI, used landscape via setRotation(3) ----
