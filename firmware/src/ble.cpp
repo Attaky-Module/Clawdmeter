@@ -3,7 +3,7 @@
 #include <NimBLEDevice.h>
 #include <NimBLEHIDDevice.h>
 
-#define DEVICE_NAME "Claude Controller"
+#define DEVICE_NAME "Attaky Claude Monitor"
 
 // Custom GATT UUIDs for data channel
 #define SERVICE_UUID        "4c41555a-4465-7669-6365-000000000001"
@@ -72,12 +72,13 @@ static void start_advertising() {
     NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
     adv->reset();
     // Primary advertising packet (≤31 bytes):
-    //   flags (3) + appearance (4) + HID service 0x1812 (4) + name "Claude Controller" (19)
+    //   flags (3) + HID service 0x1812 (4) + name "Attaky Claude Monitor" (23)
     //   = 30 bytes. macOS Bluetooth Settings only surfaces BLE-only devices
     //   that explicitly advertise the standard HID service UUID (0x1812) —
     //   without it the device is recognized internally but hidden from the
-    //   GUI nearby-devices list.
-    adv->setAppearance(HID_KEYBOARD);
+    //   GUI nearby-devices list. Appearance AD (4 bytes) was dropped to make
+    //   room for the longer name; the HID-keyboard icon hint disappears in
+    //   some OS chrome, but discoverability via 0x1812 is preserved.
     adv->addServiceUUID(NimBLEUUID((uint16_t)0x1812));  // BLE HID Service
     adv->setName(DEVICE_NAME);
     // Scan response carries the 128-bit custom data-service UUID for active

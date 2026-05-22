@@ -7,6 +7,7 @@
 #define THEME_PANEL    lv_color_hex(0x1f1f1e)   // card/zone fill
 #define THEME_TEXT     lv_color_hex(0xfaf9f5)   // primary text
 #define THEME_DIM      lv_color_hex(0xb0aea5)   // secondary text
+#define THEME_DIM2     lv_color_hex(0x7a7872)   // tertiary text (deeper grey, e.g. lower-priority credits)
 #define THEME_ACCENT   lv_color_hex(0xd97757)   // brand terra-cotta
 #define THEME_GREEN    lv_color_hex(0x788c5d)
 #define THEME_AMBER    lv_color_hex(0xd97757)

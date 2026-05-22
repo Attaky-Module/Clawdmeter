@@ -19,6 +19,7 @@ LV_FONT_DECLARE(font_mono_18);
 #define COL_PANEL     THEME_PANEL
 #define COL_TEXT      THEME_TEXT
 #define COL_DIM       THEME_DIM
+#define COL_DIM2      THEME_DIM2
 #define COL_ACCENT    THEME_ACCENT
 #define COL_GREEN     THEME_GREEN
 #define COL_AMBER     THEME_AMBER
@@ -329,8 +330,10 @@ static void init_bluetooth_screen(lv_obj_t* scr) {
     lv_obj_set_style_text_color(lbl_ble_mac, COL_DIM, 0);
     lv_obj_set_pos(lbl_ble_mac, 0, 72);
 
-    // Reset Bluetooth tap zone with trash icon (height clears the 48px icon)
-    int reset_y = CONTENT_Y + 102 + 8;
+    // Reset Bluetooth tap zone with trash icon (height clears the 48px icon).
+    // Gap to p_info shrunk from 8 to 2 px to make room for a 3-line credit
+    // stack at the bottom (Attaky port / original / animation).
+    int reset_y = CONTENT_Y + 102 + 2;
     lv_obj_t* reset_zone = lv_obj_create(ble_container);
     lv_obj_set_pos(reset_zone, MARGIN, reset_y);
     lv_obj_set_size(reset_zone, CONTENT_W, 50);
@@ -355,18 +358,26 @@ static void init_bluetooth_screen(lv_obj_t* scr) {
     lv_obj_set_style_text_font(reset_lbl, &font_styrene_16, 0);
     lv_obj_set_style_text_color(reset_lbl, COL_DIM, 0);
 
-    // Attribution
-    lv_obj_t* lbl_credit = lv_label_create(ble_container);
-    lv_label_set_text(lbl_credit, "Built by @hermannbjorgvin");
-    lv_obj_set_style_text_font(lbl_credit, &font_styrene_14, 0);
-    lv_obj_set_style_text_color(lbl_credit, COL_DIM, 0);
-    lv_obj_align(lbl_credit, LV_ALIGN_BOTTOM_MID, 0, -18);
+    // Attribution — 3-line stack, Attaky line on top in COL_DIM, then
+    // upstream credits in COL_DIM2 (deeper grey) so the Attaky line reads
+    // visually as the primary on-device attribution.
+    lv_obj_t* lbl_credit_attaky = lv_label_create(ble_container);
+    lv_label_set_text(lbl_credit_attaky, "Attaky Modular Device port");
+    lv_obj_set_style_text_font(lbl_credit_attaky, &font_styrene_14, 0);
+    lv_obj_set_style_text_color(lbl_credit_attaky, COL_DIM, 0);
+    lv_obj_align(lbl_credit_attaky, LV_ALIGN_BOTTOM_MID, 0, -29);
 
-    lv_obj_t* lbl_credit2 = lv_label_create(ble_container);
-    lv_label_set_text(lbl_credit2, "Clawd animation by @amaanbuilds");
-    lv_obj_set_style_text_font(lbl_credit2, &font_styrene_12, 0);
-    lv_obj_set_style_text_color(lbl_credit2, COL_DIM, 0);
-    lv_obj_align(lbl_credit2, LV_ALIGN_BOTTOM_MID, 0, -3);
+    lv_obj_t* lbl_credit_hb = lv_label_create(ble_container);
+    lv_label_set_text(lbl_credit_hb, "Original by @hermannbjorgvin");
+    lv_obj_set_style_text_font(lbl_credit_hb, &font_styrene_12, 0);
+    lv_obj_set_style_text_color(lbl_credit_hb, COL_DIM2, 0);
+    lv_obj_align(lbl_credit_hb, LV_ALIGN_BOTTOM_MID, 0, -16);
+
+    lv_obj_t* lbl_credit_anim = lv_label_create(ble_container);
+    lv_label_set_text(lbl_credit_anim, "Clawd animation by @amaanbuilds");
+    lv_obj_set_style_text_font(lbl_credit_anim, &font_styrene_12, 0);
+    lv_obj_set_style_text_color(lbl_credit_anim, COL_DIM2, 0);
+    lv_obj_align(lbl_credit_anim, LV_ALIGN_BOTTOM_MID, 0, -3);
 
     // Start hidden
     lv_obj_add_flag(ble_container, LV_OBJ_FLAG_HIDDEN);

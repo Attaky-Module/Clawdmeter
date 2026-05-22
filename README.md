@@ -68,12 +68,12 @@ Flashing runs at 460800 baud (the CH340X is not reliable at 921600).
 ### Pair the device
 
 After flashing, open **System Settings → Bluetooth** and click
-*Connect* next to **"Claude Controller"**. The daemon discovers it on
+*Connect* next to **"Attaky Claude Monitor"**. The daemon discovers it on
 its next scan (~30 s).
 
 If you ever tap **Reset Bluetooth** on the device, it drops its bond;
 macOS will then refuse to reconnect with *"Peer removed pairing
-information"*. That is expected — *Forget* "Claude Controller" in
+information"*. That is expected — *Forget* "Attaky Claude Monitor" in
 System Settings → Bluetooth, then connect again.
 
 ### Install the daemon
@@ -114,14 +114,14 @@ The Core's CH340X enumerates as `/dev/ttyUSB0` (not `/dev/ttyACM0`):
 
 ### Pair the device
 
-After flashing, the device advertises as **"Claude Controller"**. Pair
+After flashing, the device advertises as **"Attaky Claude Monitor"**. Pair
 it once:
 
 ```bash
 # Scan for the device
 bluetoothctl scan le
 
-# When "Claude Controller" appears, pair and trust it
+# When "Attaky Claude Monitor" appears, pair and trust it
 bluetoothctl pair AA:BB:CC:DD:EE:FF    # use your device's MAC
 bluetoothctl trust AA:BB:CC:DD:EE:FF
 ```
