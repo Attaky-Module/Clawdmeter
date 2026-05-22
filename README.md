@@ -1,10 +1,10 @@
-# Clawdmeter — Attaky Core edition
+# Clawdmeter — Attaky Modular Device edition
 
-A Claude Code usage dashboard for the **Attaky Core_ESP32_1.0** modular
-hardware. It pairs with your computer over Bluetooth; the splash screen
-plays pixel-art Clawd animations that get busier as your usage rate
-climbs, and the physical keys double as a BLE HID keyboard for Claude
-Code shortcuts.
+A Claude Code usage dashboard for **Attaky Modular Device** hardware.
+It pairs with your computer over Bluetooth; the splash screen plays
+pixel-art Clawd animations that get busier as your usage rate climbs,
+and the physical keys double as a BLE HID keyboard for Claude Code
+shortcuts.
 
 |              Splash               |              Usage              |                Bluetooth                |
 | :-------------------------------: | :-----------------------------: | :-------------------------------------: |
@@ -25,18 +25,16 @@ on loop.
 
 ## Hardware
 
-- **Attaky Core_ESP32_1.0** — ESP32-S3-WROOM-1U-N16R8 (16 MB flash,
-  8 MB PSRAM), ST7789 panel (240×320 native, driven in landscape so the
-  UI is 320×240) over SPI, FT6636 capacitive touch,
-  two AW9523 I²C IO expanders (physical buttons, touch reset, RGB LED),
-  QMI8658A IMU (present, unused by this firmware), CH340X USB-UART for
-  flashing and serial.
-- **Attaky Power_Standard-Cell_1.0** — MAX17048 fuel gauge over the
-  shared I²C bus for battery percentage; supplies the Li-Po.
+- **Attaky Core 1.0** — 320 × 240 landscape touchscreen, physical
+  buttons, RGB indicator, and a motion sensor (present but unused by
+  this firmware). Connects to the host over USB-C for flashing and
+  serial.
+- **Attaky Power_Standard-Cell_1.0** — Li-Po battery with on-board
+  fuel gauge that reports battery percentage to the firmware.
 - USB-C cable for flashing firmware and charging.
 
-There is no PMU on the Core: a long-press of the hardware POWER button
-toggles power directly and is not seen by firmware.
+The hardware POWER button is a long-press power toggle handled at
+the board level; firmware doesn't see it.
 
 ## Prerequisites
 
@@ -283,7 +281,7 @@ See `tools/README.md` for details.
 - Original Clawdmeter by @hermannbjorgvin.
 - macOS host pieces (daemon, LaunchAgent, flash helper) by
   Chris Davidson (@lorddavidson).
-- Attaky Core_ESP32_1.0 hardware adaptation by the Attaky project.
+- Attaky Core 1.0 hardware adaptation by the Attaky project.
 - Pixel-art Clawd animation by @amaanbuilds. Frame data and palettes
   scraped + converted by the tooling in `tools/`.
 - Lucide icon set (MIT) for the bluetooth and battery UI glyphs.
