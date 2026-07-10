@@ -2,8 +2,8 @@
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 #include <NimBLEHIDDevice.h>
-
-#define DEVICE_NAME "Attaky Claude Monitor"
+#include <Preferences.h>
+#include "hal/board_caps.h"
 
 // Custom GATT UUIDs for data channel
 #define SERVICE_UUID        "4c41555a-4465-7669-6365-000000000001"
@@ -68,19 +68,87 @@ static volatile bool data_ready = false;
 static volatile bool has_received_data = false;
 static char mac_str[18];
 
+// --- Single-owner lock -----------------------------------------------------
+//
+// The board is a BLE peripheral that any central in range could connect to and
+// write usage data to. To stop the display rotating to another machine's
+// account, it locks to ONE owner: the identity address of the machine it is
+// bonded to, persisted in NVS. Only that owner (over a bonded+encrypted link)
+// may write usage data; a second machine that pairs is rejected so the board
+// stays paired to a single machine. The hold-power bond-clear gesture resets
+// the owner so the board can be handed to a different machine.
+static Preferences prefs;
+static char owner_addr[18] = {0};   // owner identity address, e.g. "aa:bb:cc:dd:ee:ff"
+static bool owner_set = false;
+static const char* ZERO_ADDR = "00:00:00:00:00:00";
+
+static void save_owner() {
+    prefs.begin("clawd", false);
+    prefs.putString("owner", owner_addr);
+    prefs.end();
+}
+
+static void clear_owner() {
+    owner_set = false;
+    owner_addr[0] = '\0';
+    prefs.begin("clawd", false);
+    prefs.remove("owner");
+    prefs.end();
+}
+
+static void load_owner() {
+    prefs.begin("clawd", true);
+    String o = prefs.getString("owner", "");
+    prefs.end();
+    if (o.length() == 17) {  // "aa:bb:cc:dd:ee:ff"
+        strncpy(owner_addr, o.c_str(), sizeof(owner_addr) - 1);
+        owner_addr[sizeof(owner_addr) - 1] = '\0';
+        owner_set = true;
+        Serial.printf("BLE: owner loaded = %s\n", owner_addr);
+    }
+}
+
+// Delete every stored bond that isn't the owner, so the board stays paired to
+// exactly one machine. Removing a bond shifts the indices, so restart from 0.
+static void prune_foreign_bonds() {
+    if (!owner_set) return;
+    bool removed;
+    do {
+        removed = false;
+        int n = NimBLEDevice::getNumBonds();
+        for (int i = 0; i < n; i++) {
+            NimBLEAddress a = NimBLEDevice::getBondedAddress(i);
+            if (strcmp(a.toString().c_str(), owner_addr) != 0) {
+                Serial.printf("BLE: pruning non-owner bond %s\n", a.toString().c_str());
+                NimBLEDevice::deleteBond(a);
+                removed = true;
+                break;
+            }
+        }
+    } while (removed);
+}
+
+static void claim_owner(const std::string& id) {
+    strncpy(owner_addr, id.c_str(), sizeof(owner_addr) - 1);
+    owner_addr[sizeof(owner_addr) - 1] = '\0';
+    owner_set = true;
+    save_owner();
+    Serial.printf("BLE: owner claimed = %s\n", owner_addr);
+    prune_foreign_bonds();
+}
+
 static void start_advertising() {
     NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
     adv->reset();
     // Primary advertising packet (≤31 bytes):
-    //   flags (3) + HID service 0x1812 (4) + name "Attaky Claude Monitor" (23)
-    //   = 30 bytes. macOS Bluetooth Settings only surfaces BLE-only devices
+    //   flags (3) + HID service 0x1812 (4) + complete name. macOS Bluetooth
+    //   Settings only surfaces BLE-only devices
     //   that explicitly advertise the standard HID service UUID (0x1812) —
     //   without it the device is recognized internally but hidden from the
-    //   GUI nearby-devices list. Appearance AD (4 bytes) was dropped to make
-    //   room for the longer name; the HID-keyboard icon hint disappears in
-    //   some OS chrome, but discoverability via 0x1812 is preserved.
+    //   GUI nearby-devices list. Appearance is omitted so long board-specific
+    //   names such as "Attaky Claude Monitor" still fit in the primary packet.
     adv->addServiceUUID(NimBLEUUID((uint16_t)0x1812));  // BLE HID Service
-    adv->setName(DEVICE_NAME);
+    adv->setName(ble_get_device_name());
     // Scan response carries the 128-bit custom data-service UUID for active
     // scanners (the host daemon scans actively).
     NimBLEAdvertisementData scanResp;
@@ -122,13 +190,45 @@ class ServerCallbacks : public NimBLEServerCallbacks {
             reason, (unsigned)s->getConnectedCount());
     }
 
+    // Lock the board to a single owner machine. The first machine to bond
+    // becomes the owner; any other machine that pairs is un-bonded and dropped
+    // so the board never shows (or rotates to) a second machine's account.
+    void onAuthenticationComplete(NimBLEConnInfo& info) override {
+        std::string id = info.getIdAddress().toString();
+        Serial.printf("BLE: auth complete peer=%s bonded=%d enc=%d\n",
+            id.c_str(), info.isBonded() ? 1 : 0, info.isEncrypted() ? 1 : 0);
+        if (id == ZERO_ADDR) return;
+        if (!owner_set) {
+            claim_owner(id);
+        } else if (strcmp(id.c_str(), owner_addr) != 0) {
+            Serial.printf("BLE: rejecting non-owner %s (owner=%s)\n", id.c_str(), owner_addr);
+            NimBLEDevice::deleteBond(info.getIdAddress());
+            server->disconnect(info);
+        }
+    }
+
 };
 
 class RxCallbacks : public NimBLECharacteristicCallbacks {
     void onWrite(NimBLECharacteristic* chr, NimBLEConnInfo& info) override {
+        // Only accept usage data over a bonded+encrypted link, and only from the
+        // owner machine. Another machine's daemon in range is ignored so the
+        // display never rotates to a foreign account. The first encrypted writer
+        // claims ownership when none is set yet (e.g. a fresh pairing).
+        std::string id = info.getIdAddress().toString();
+        if (!info.isEncrypted()) {
+            Serial.println("BLE: dropping RX write from unencrypted link");
+            return;
+        }
+        if (!owner_set && id != ZERO_ADDR) {
+            claim_owner(id);
+        }
+        if (owner_set && strcmp(id.c_str(), owner_addr) != 0) {
+            Serial.printf("BLE: dropping RX write from non-owner %s\n", id.c_str());
+            return;
+        }
         std::string val = chr->getValue();
-        size_t len = val.length();
-        if (len >= BLE_BUF_SIZE) len = BLE_BUF_SIZE - 1;
+        size_t len = std::min(val.length(), (size_t)(BLE_BUF_SIZE - 1));
         memcpy(rx_buf, val.c_str(), len);
         rx_buf[len] = '\0';
         data_ready = true;
@@ -149,8 +249,13 @@ class ReqCallbacks : public NimBLECharacteristicCallbacks {
 };
 
 void ble_init(void) {
-    NimBLEDevice::init(DEVICE_NAME);
+    NimBLEDevice::init(ble_get_device_name());
     NimBLEDevice::setSecurityAuth(true, false, true);  // bonding, no MITM, SC
+
+    // Restore the locked owner (if any) and drop any stale non-owner bonds so
+    // the board stays paired to a single machine across reboots.
+    load_owner();
+    prune_foreign_bonds();
 
     // Format MAC address
     NimBLEAddress addr = NimBLEDevice::getAddress();
@@ -222,7 +327,7 @@ ble_state_t ble_get_state(void) {
 }
 
 const char* ble_get_device_name(void) {
-    return DEVICE_NAME;
+    return board_caps().ble_name;
 }
 
 const char* ble_get_mac_address(void) {
@@ -231,11 +336,16 @@ const char* ble_get_mac_address(void) {
 
 void ble_clear_bonds(void) {
     NimBLEDevice::deleteAllBonds();
+    clear_owner();  // release ownership so the board can be handed to another machine
     Serial.println("BLE: bonds cleared");
     if (state == BLE_STATE_CONNECTED) {
         server->disconnect(server->getPeerInfo(0).getConnHandle());
     }
     need_advertise = true;
+}
+
+bool ble_has_bonds(void) {
+    return NimBLEDevice::getNumBonds() > 0;
 }
 
 bool ble_has_data(void) {

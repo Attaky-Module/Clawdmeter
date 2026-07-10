@@ -18,6 +18,3 @@ daemon/.venv/
 # Python bytecode cache
 __pycache__/
 *.pyc
-
-# local debug screenshots
-_debug_photo/

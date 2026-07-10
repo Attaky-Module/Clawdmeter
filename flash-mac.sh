@@ -1,20 +1,30 @@
 #!/bin/bash
-# Build and flash firmware on macOS (Attaky Core_ESP32_1.0).
-# The Core uses an external CH340X USB-UART, which enumerates as
-# /dev/cu.usbserial-* (NOT /dev/cu.usbmodem*).
+# Build and flash Clawdmeter firmware on macOS.
 # Usage:
-#   ./flash-mac.sh                       # auto-detect /dev/cu.usbserial-*
-#   ./flash-mac.sh /dev/cu.usbserial-2120  # explicit CH340X serial port
+#   ./flash-mac.sh <board>                       # auto-detect /dev/cu.usbmodem*
+#   ./flash-mac.sh <board> /dev/cu.usbmodem1101  # explicit USB serial port
+#
+# <board> is the PlatformIO env name, e.g. waveshare_amoled_216 or waveshare_amoled_18.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PORT="$1"
+BOARD="$1"
+PORT="$2"
+
+if [ -z "$BOARD" ]; then
+    echo "Error: board env name is required."
+    echo "Usage: $0 <board> [port]"
+    echo "Available boards:"
+    grep -E '^\[env:' "$SCRIPT_DIR/firmware/platformio.ini" | sed 's/\[env:/  /;s/\]//'
+    exit 1
+fi
 
 if [ -z "$PORT" ]; then
-    PORT=$(ls /dev/cu.usbserial-* 2>/dev/null | head -1)
+    # Native-USB boards enumerate as usbmodem*; CH340-bridged boards
+    # (Attaky Core) as usbserial-*.
+    PORT=$(ls /dev/cu.usbmodem* /dev/cu.usbserial-* 2>/dev/null | head -1)
     if [ -z "$PORT" ]; then
-        echo "Error: no /dev/cu.usbserial-* device found. Plug in via USB-C"
-        echo "and check the CH340 driver is installed."
+        echo "Error: no /dev/cu.usbmodem* or /dev/cu.usbserial-* device found. Plug in via USB-C."
         exit 1
     fi
 fi
@@ -25,12 +35,13 @@ if ! command -v pio >/dev/null; then
     exit 1
 fi
 
-echo "=== Flashing firmware (Attaky Core) ==="
-echo "Port: $PORT"
+echo "=== Flashing Clawdmeter ==="
+echo "Board: $BOARD"
+echo "Port:  $PORT"
 echo ""
 
 cd "$SCRIPT_DIR/firmware"
-pio run -t upload --upload-port "$PORT"
+pio run -e "$BOARD" -t upload --upload-port "$PORT"
 
 echo ""
 echo "=== Done ==="

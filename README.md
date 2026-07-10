@@ -20,7 +20,7 @@
 
 > This repository is a fork of [Clawdmeter](https://github.com/HermannBjorgvin/Clawdmeter),
 > originally developed by [Hermann Björgvin Haraldsson](https://github.com/HermannBjorgvin),
-> last modified by Attaky on **2026-07-10** from upstream **`bd2afb5`** (2026-05-11),
+> last modified by Attaky on **2026-07-10** from upstream **`ca8a642`** (2026-07-09),
 > to add support for the **Attaky Modular Device**. Upstream is intentionally
 > unlicensed because of bundled copyrighted mascot assets — see the
 > [licensing notes](#licensing-gray-area-warning) below.
@@ -31,10 +31,10 @@ pixel-art Clawd animations that get busier as your usage rate climbs,
 and the physical keys double as a BLE HID keyboard for Claude Code
 shortcuts.
 
-|              Splash               |              Usage              |                Bluetooth                |
-| :-------------------------------: | :-----------------------------: | :-------------------------------------: |
-| ![Splash](screenshots/splash.png) | ![Usage](screenshots/usage.png) | ![Bluetooth](screenshots/bluetooth.png) |
-|   Splash; touch-toggle anytime    | Session and weekly utilization  |    Connection status and bond reset     |
+|              Splash               |              Usage              |
+| :-------------------------------: | :-----------------------------: |
+| ![Splash](screenshots/attaky-splash.png) | ![Usage](screenshots/attaky-usage.png) |
+|   Splash; touch-toggle anytime    | Session and weekly utilization  |
 
 ## Compatible devices
 
@@ -64,10 +64,16 @@ the board level; firmware doesn't see it.
   alongside the upstream Linux host
 - **Freely licensed UI typefaces** — Source Serif 4 + Archivo (SIL OFL
   1.1) replace the proprietary brand fonts bundled upstream
-- **BLE rename** — the device advertises as **"Attaky Claude Monitor"**
+- **BLE rename** — the device advertises as **"Attaky Claude Monitor"**;
+  the host daemons pick the name via `CLAWDMETER_DEVICE_NAME` (that is
+  already the default, so upstream Waveshare users set it to
+  `Clawdmeter`)
 
-Upstream behavior (usage polling, BLE protocol, splash animation
-logic) is unchanged.
+Attaky Core is implemented as a first-class board under upstream's
+board-HAL layout (`firmware/src/boards/attaky_core_esp32/` + the
+`attaky_core_esp32` PlatformIO env), so upstream behavior (usage
+polling, BLE protocol, splash animation logic) is unchanged and future
+upstream updates stay easy to merge.
 
 ## Build & flash
 
@@ -88,9 +94,9 @@ Prerequisites:
 - macOS: `python3` (the installer sets up a venv with `bleak` and `httpx`)
 - Claude Code with an active subscription
 
-Build with `pio run -d firmware`; flashing runs at 460800 baud (the
-USB-serial bridge is not reliable at 921600). Full flash + pairing +
-daemon setup is per-OS below.
+Build with `pio run -d firmware -e attaky_core_esp32`; flashing runs
+at 460800 baud (the USB-serial bridge is not reliable at 921600). Full
+flash + pairing + daemon setup is per-OS below.
 
 ## macOS installation
 
@@ -99,9 +105,12 @@ daemon setup is per-OS below.
 The Core enumerates as `/dev/cu.usbserial-*` (not `/dev/cu.usbmodem*`):
 
 ```bash
-./flash-mac.sh                          # auto-detects /dev/cu.usbserial-*
-./flash-mac.sh /dev/cu.usbserial-2120   # or pass an explicit port
+./flash-mac.sh attaky_core_esp32                          # auto-detects /dev/cu.usbserial-*
+./flash-mac.sh attaky_core_esp32 /dev/cu.usbserial-2120   # or pass an explicit port
 ```
+
+The board env name is required — run `./flash-mac.sh` with no args to
+list the available envs.
 
 ### Pair the device
 
@@ -109,10 +118,12 @@ After flashing, open **System Settings → Bluetooth** and click
 *Connect* next to **"Attaky Claude Monitor"**. The daemon discovers it on
 its next scan (~30 s).
 
-If you ever tap **Reset Bluetooth** on the device, it drops its bond;
-macOS will then refuse to reconnect with *"Peer removed pairing
-information"*. That is expected — *Forget* "Attaky Claude Monitor" in
-System Settings → Bluetooth, then connect again.
+To make the device forget its bond (e.g. to move it to another
+computer), hold the **BOOT** button for 3 seconds and release — the
+device clears its saved bond and re-advertises. macOS will then refuse
+to auto-reconnect with *"Peer removed pairing information"*; that is
+expected — *Forget* "Attaky Claude Monitor" in System Settings →
+Bluetooth, then connect again.
 
 ### Install the daemon
 
@@ -146,8 +157,8 @@ launchctl load -w ~/Library/LaunchAgents/com.user.claude-usage-daemon.plist # st
 The Core enumerates as `/dev/ttyUSB0` (not `/dev/ttyACM0`):
 
 ```bash
-./flash.sh                       # defaults to /dev/ttyUSB0
-./flash.sh /dev/ttyUSB1          # or pass an explicit port
+./flash.sh attaky_core_esp32                 # auto-picks /dev/ttyACM0, else /dev/ttyUSB0
+./flash.sh attaky_core_esp32 /dev/ttyUSB1    # or pass an explicit port
 ```
 
 ### Pair the device
@@ -164,8 +175,10 @@ bluetoothctl pair AA:BB:CC:DD:EE:FF    # use your device's MAC
 bluetoothctl trust AA:BB:CC:DD:EE:FF
 ```
 
-The MAC address is shown on the Bluetooth screen — press the BOOT
-button to cycle to it.
+The device's MAC shows up in the `bluetoothctl scan le` output next to
+the advertised name (it is also printed on the serial console at boot).
+To re-pair later, hold the **BOOT** button for 3 seconds then release —
+the device clears its saved bond and re-advertises.
 
 ### Install the daemon
 
@@ -183,15 +196,17 @@ View logs: `journalctl --user -u claude-usage-daemon -f`
 
 ## Screens
 
-The device boots into the splash and stays there until you press the
-**BOOT** button, which cycles between Usage and Bluetooth. Tap the
-screen anywhere (except the Reset zone on the Bluetooth screen) to flip
-back to the splash; tap again to dismiss it.
+The device boots into the splash. Tap the screen anywhere to flip
+between the splash and the Usage view. The **BOOT** button steps to the
+next animation while the splash is up, and returns to the splash from
+the Usage view. The firmware also auto-rotates every 20 s within the
+current usage-rate group, so a long stretch on the splash isn't just
+one Clawd on loop.
 
-While the splash is up, the BOOT button cycles animations instead of
-screens. The firmware also auto-rotates every 20 s within the current
-usage-rate group, so a long stretch on the splash isn't just one Clawd
-on loop.
+Connection status lives on the Usage view; when the device is unpaired
+it shows a pairing hint instead of usage data. A short press of the
+**POWER** button cycles screen brightness (on the splash it cycles
+animations).
 
 ## How it works
 
@@ -220,12 +235,13 @@ whatever window has focus on the paired host — not just Claude Code.
 | **SELECT**     | Enter / confirm                                 |
 | **L1**         | Shift+Tab (Claude Code mode toggle)             |
 | **R2**         | Space (Claude Code voice-mode push-to-talk)     |
-| **BOOT**       | Cycle screens; on splash, cycle animations      |
+| **BOOT**       | Short: next animation on splash, back to splash from Usage · hold 3 s + release: clear bond / pairing mode |
+| **POWER**      | Short: cycle brightness (cycle animations on splash) |
 
 The D-pad, SELECT, L1 and R2 keys are read through the on-board I²C IO
-expander; BOOT is a dedicated GPIO. The hardware POWER button is a
-power toggle handled below the firmware and is intentionally not
-mapped.
+expander; BOOT is a dedicated GPIO. A long press of the hardware POWER
+button is a power toggle handled below the firmware — the firmware only
+ever sees POWER short-presses, which is why hold-to-pair lives on BOOT.
 
 ## BLE protocol
 
@@ -251,37 +267,39 @@ Fields: `s` = session %, `sr` = session reset (minutes), `w` = weekly %,
 
 ## Recompiling fonts
 
-The `firmware/src/font_*.c` files are pre-compiled LVGL bitmap fonts.
-The 320×240 build uses the sizes already in the repo
-(Serif 34; Sans 28/16/14/12; Mono 18). All three source typefaces are
-freely licensed — Source Serif 4 (display serif) and Archivo (UI sans)
-under the SIL OFL 1.1 (license texts in `assets/`), DejaVu Sans Mono
-under the DejaVu/Bitstream Vera license. You only need this section if
-you want to change the sizes.
+The `firmware/src/font_*.c` files are pre-compiled LVGL bitmap fonts
+shared by all board sizes (Serif 56/34; Sans 48/28/24/20/16/14;
+Mono 32/18). All three source typefaces are freely licensed — Source
+Serif 4 (display serif) and Archivo (UI sans) under the SIL OFL 1.1
+(license texts in `assets/`), DejaVu Sans Mono under the
+DejaVu/Bitstream Vera license. You only need this section if you want
+to change the sizes.
 
 ```bash
 npm install -g lv_font_conv
 ```
 
-Generate each one (one at a time — `lv_font_conv` doesn't like
-loop-driven invocations) with `--no-compress` (required for LVGL 9),
-e.g.:
+Generate with `--no-compress` (required for LVGL 9), e.g.:
 
 ```bash
-lv_font_conv --font assets/SourceSerif4-Regular.ttf -r 0x20-0x7E \
-  --size 34 --format lvgl --bpp 4 --no-compress \
-  -o firmware/src/font_serif_34.c --lv-include "lvgl.h"
+for size in 56 34; do
+  lv_font_conv --font assets/SourceSerif4-Regular.ttf -r 0x20-0x7E \
+    --size $size --format lvgl --bpp 4 --no-compress \
+    -o firmware/src/font_serif_${size}.c --lv-include "lvgl.h"
+done
 
-for size in 28 16 14 12; do
+for size in 48 28 24 20 16 14; do
   lv_font_conv --font assets/Archivo-Regular.ttf -r 0x20-0x7E \
     --size $size --format lvgl --bpp 4 --no-compress \
     -o firmware/src/font_sans_${size}.c --lv-include "lvgl.h"
 done
 
-lv_font_conv --font assets/DejaVuSansMono.ttf \
-  -r 0x20-0x7E,0xB7,0x2026,0x2722,0x2733,0x2736,0x273B,0x273D \
-  --size 18 --format lvgl --bpp 4 --no-compress \
-  -o firmware/src/font_mono_18.c --lv-include "lvgl.h"
+for size in 32 18; do
+  lv_font_conv --font assets/DejaVuSansMono.ttf \
+    -r 0x20-0x7E,0xB7,0x2026,0x2722,0x2733,0x2736,0x273B,0x273D \
+    --size $size --format lvgl --bpp 4 --no-compress \
+    -o firmware/src/font_mono_${size}.c --lv-include "lvgl.h"
+done
 ```
 
 **Important:** `lv_font_conv` v1.5.3 outputs LVGL 8 format. Each

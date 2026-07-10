@@ -1,82 +1,103 @@
 #include <Arduino.h>
+#include <Wire.h>
 #include <lvgl.h>
 #include <ArduinoJson.h>
-#include "display_cfg.h"
+#include <esp_heap_caps.h>
+
 #include "data.h"
 #include "ui.h"
 #include "ble.h"
-#include "power.h"
-#include "buttons.h"
-#include "ft6636.h"
-#include "aw9523.h"
 #include "splash.h"
 #include "usage_rate.h"
+#include "idle.h"
+#include "idle_cfg.h"
+#include "brightness.h"
 
-// ---- Hardware object ----
-TFT_eSPI tft = TFT_eSPI();
+#include "hal/board_caps.h"
+#include "hal/display_hal.h"
+#include "hal/touch_hal.h"
+#include "hal/input_hal.h"
+#include "hal/power_hal.h"
+#include "hal/imu_hal.h"
+#include "hal/sound_hal.h"
 
 static UsageData usage = {};
 
-// ---- Touch shared state (polled FT6636; INT line is behind an I2C
-//      expander so there is no GPIO ISR) ----
-static bool     touch_pressed = false;
-static uint16_t touch_x = 0;
-static uint16_t touch_y = 0;
-
-// Map FT6636 panel-native coords (nx:0..239, ny:0..319) to LVGL landscape
-// space (0..LCD_WIDTH-1, 0..LCD_HEIGHT-1) for setRotation(3) + the panel's
-// 180-degree physical mount.
-// Hardware-tested: the 4 corners pass for setRotation(3) + the
-// panel's 180-degree mount; no recalibration needed. If the panel changes,
-// re-verify by tapping the 4 corners on serial and flip axes/inversions here.
-static void map_touch(uint16_t nx, uint16_t ny, uint16_t *lx, uint16_t *ly) {
-    uint16_t x = (uint16_t)(LCD_NATIVE_H - 1 - ny);  // 0..319 -> 0..LCD_WIDTH-1
-    uint16_t y = nx;                                 // 0..239 -> 0..LCD_HEIGHT-1
-    if (x >= LCD_WIDTH)  x = LCD_WIDTH - 1;
-    if (y >= LCD_HEIGHT) y = LCD_HEIGHT - 1;
-    *lx = x;
-    *ly = y;
-}
-
-static void touch_read(void) {
-    uint16_t nx, ny;
-    if (ft6636_read(&nx, &ny)) {
-        map_touch(nx, ny, &touch_x, &touch_y);
-        touch_pressed = true;
-    } else {
-        touch_pressed = false;
-    }
-}
-
-// ---- LVGL draw buffers (PSRAM-backed, partial render) ----
+// ---- LVGL draw buffers (partial render mode) ----
+// PSRAM-equipped boards (S3) can comfortably hold larger strips. PSRAM-free
+// boards (e.g. ESP32-C6) allocate from internal SRAM, so we shrink the strip
+// — 480×20 RGB565 = 19 KB × 2 buffers = 38 KB, fits beside everything else.
+#ifdef BOARD_HAS_PSRAM
 #define BUF_LINES 40
-static uint16_t *buf1 = nullptr;
-static uint16_t *buf2 = nullptr;
+#define LV_BUF_CAPS (MALLOC_CAP_SPIRAM)
+#else
+#define BUF_LINES 20
+#define LV_BUF_CAPS (MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)
+#endif
+static uint16_t* buf1 = nullptr;
+static uint16_t* buf2 = nullptr;
 
 static uint32_t my_tick(void) { return millis(); }
 
-// ST7789 supports native rotation, so the flush is a straight blit (no CPU
-// strip-rotation / even-align rounding the CO5300 needed).
 static void my_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map) {
-    uint32_t w = area->x2 - area->x1 + 1;
-    uint32_t h = area->y2 - area->y1 + 1;
-    tft.startWrite();
-    tft.setAddrWindow(area->x1, area->y1, w, h);
-    tft.pushColors((uint16_t*)px_map, w * h, true);  // swap=true: LVGL LE -> ST7789 BE
-    tft.endWrite();
+    int32_t w = area->x2 - area->x1 + 1;
+    int32_t h = area->y2 - area->y1 + 1;
+    display_hal_draw_bitmap(area->x1, area->y1, w, h, (uint16_t*)px_map);
     lv_display_flush_ready(disp);
 }
 
+static void rounder_cb(lv_event_t* e) {
+    lv_area_t* area = (lv_area_t*)lv_event_get_param(e);
+    display_hal_round_area(&area->x1, &area->y1, &area->x2, &area->y2);
+}
+
+// Touch policy is driven by IDLE_WAKE_ON_TOUCH:
+//   true  → a press edge while asleep wakes the device and the first touch is
+//           swallowed (mirrors the button wake-consumption); a press while
+//           awake counts as activity.
+//   false → touch never counts as activity and is fully swallowed while the
+//           panel is dark, so pets/sleeves can't wake it overnight and LVGL
+//           can't quietly toggle splash<->usage on a black panel.
 static void my_touch_cb(lv_indev_t* indev, lv_indev_data_t* data) {
-    if (touch_pressed) {
-        data->point.x = touch_x;
-        data->point.y = touch_y;
+    uint16_t x, y;
+    bool pressed;
+    touch_hal_read(&x, &y, &pressed);
+    const bool raw_pressed = pressed;
+
+    if (IDLE_WAKE_ON_TOUCH) {
+        static bool touch_was = false;
+        static bool touch_wake_swallowed = false;
+        if (raw_pressed && !touch_was) {
+            // Press edge — consume as wake if asleep.
+            if (idle_consume_wake_press()) {
+                touch_wake_swallowed = true;
+                pressed = false;
+            }
+        } else if (!raw_pressed && touch_was) {
+            // Release edge.
+            if (touch_wake_swallowed) {
+                touch_wake_swallowed = false;
+                pressed = false;
+            }
+        } else if (raw_pressed && touch_wake_swallowed) {
+            // Held finger through wake — keep hiding until release.
+            pressed = false;
+        }
+        touch_was = raw_pressed;
+    } else if (idle_is_asleep()) {
+        pressed = false;
+    }
+
+    if (pressed) {
+        data->point.x = x;
+        data->point.y = y;
         data->state = LV_INDEV_STATE_PRESSED;
     } else {
         data->state = LV_INDEV_STATE_RELEASED;
     }
 }
 
+// Parse a JSON line into UsageData.
 static bool parse_json(const char* json, UsageData* out) {
     JsonDocument doc;
     DeserializationError err = deserializeJson(doc, json);
@@ -84,23 +105,39 @@ static bool parse_json(const char* json, UsageData* out) {
         Serial.printf("JSON parse error: %s\n", err.c_str());
         return false;
     }
+
     out->session_pct = doc["s"] | 0.0f;
     out->session_reset_mins = doc["sr"] | -1;
     out->weekly_pct = doc["w"] | 0.0f;
     out->weekly_reset_mins = doc["wr"] | -1;
     strlcpy(out->status, doc["st"] | "unknown", sizeof(out->status));
+    out->chime = doc["c"] | false;   // absent (old daemon / chime off) → stay silent
+    const char* acct = doc["acct"] | "pro";
+    out->enterprise = (strcmp(acct, "ent") == 0);
+    out->time_pct = doc["tp"] | 0;
+    out->period_days = doc["pd"] | 30;
+    strlcpy(out->reset_date, doc["rd"] | "", sizeof(out->reset_date));
+    out->clock_epoch = doc["t"] | 0L;
+    out->clock_fmt = doc["tf"] | 24;
     out->ok = doc["ok"] | false;
     out->valid = true;
     return true;
 }
 
-// ---- Serial command buffer (UART0 via CH340X) ----
+// ---- Serial command buffer ----
 #define CMD_BUF_SIZE 64
 static char cmd_buf[CMD_BUF_SIZE];
 static int cmd_pos = 0;
 
 static void send_screenshot() {
-    const uint32_t w = LCD_WIDTH, h = LCD_HEIGHT;
+#ifndef BOARD_HAS_PSRAM
+    // A full RGB565 framebuffer doesn't fit in internal SRAM on PSRAM-free
+    // boards (e.g. 480×480×2 = 460 KB). Capture is unsupported there.
+    Serial.println("SCREENSHOT_UNSUPPORTED");
+    return;
+#else
+    const uint32_t w = board_caps().width;
+    const uint32_t h = board_caps().height;
     const uint32_t row_bytes = w * 2;
     const uint32_t buf_size = row_bytes * h;
     uint8_t* sbuf = (uint8_t*)heap_caps_malloc(buf_size, MALLOC_CAP_SPIRAM);
@@ -119,14 +156,15 @@ static void send_screenshot() {
         return;
     }
 
-    Serial.printf("SCREENSHOT_START %lu %lu %lu\n", (unsigned long)w, (unsigned long)h, (unsigned long)buf_size);
+    Serial.printf("SCREENSHOT_START %lu %lu %lu\n",
+        (unsigned long)w, (unsigned long)h, (unsigned long)buf_size);
     Serial.flush();
     Serial.write(sbuf, buf_size);
     Serial.flush();
     Serial.println();
     Serial.println("SCREENSHOT_END");
-
     heap_caps_free(sbuf);
+#endif
 }
 
 static void check_serial_cmd() {
@@ -134,9 +172,8 @@ static void check_serial_cmd() {
         char c = Serial.read();
         if (c == '\n' || c == '\r') {
             cmd_buf[cmd_pos] = '\0';
-            if (strcmp(cmd_buf, "screenshot") == 0) {
-                send_screenshot();
-            }
+            if (strcmp(cmd_buf, "screenshot") == 0) send_screenshot();
+            else if (strcmp(cmd_buf, "buzz") == 0)  sound_hal_play_reset();
             cmd_pos = 0;
         } else if (cmd_pos < CMD_BUF_SIZE - 1) {
             cmd_buf[cmd_pos++] = c;
@@ -144,129 +181,244 @@ static void check_serial_cmd() {
     }
 }
 
+// Each board provides this. Must bring up the shared I2C bus (Wire.begin
+// with the board's SDA/SCL pins) and any board-private hardware that has
+// to settle before display/touch (e.g. an IO expander gating the LCD
+// reset line). Called exactly once at the start of setup().
+extern "C" void board_init(void);
+
 void setup() {
-    Serial.begin(115200);   // UART0 → CH340X (no native USB; no USB CDC flag)
+    Serial.begin(115200);
     delay(300);
     Serial.println("{\"ready\":true}");
 
-    // Single shared I2C bus (SCL=IO1, SDA=IO2): touch, expanders, fuel gauge.
-    Wire.begin(IIC_SDA, IIC_SCL);
-    Wire.setClock(I2C_FREQ_HZ);
+    board_init();
 
-    // Backlight: drive IO14 as GPIO HIGH before TFT_eSPI touches it
-    // (Arduino-3.x core errors if TFT_BL is written before pinMode).
-    pinMode(LCD_BL, OUTPUT);
-    digitalWrite(LCD_BL, HIGH);
+    display_hal_init();
+    display_hal_begin();
+    idle_init();        // takes over panel brightness and starts the idle timer
+    brightness_init();  // load the user's saved brightness level and apply via idle
 
-    // Display: ST7789 via TFT_eSPI, fixed landscape.
-    tft.init();
-    tft.setRotation(LCD_ROTATION);
-    tft.fillScreen(TFT_BLACK);
+    power_hal_init();
+    imu_hal_init();
+    sound_hal_init();
+    touch_hal_init();
 
-    // IO expanders first (touch reset + buttons live behind them).
-    aw9523_init();
+    // ---- LVGL ----
+    const int W = board_caps().width;
+    const int H = board_caps().height;
 
-    // Battery fuel gauge (MAX17048 on the Power module).
-    power_init();
-
-    // Touch (FT6636; hardware-reset via AW9523_B P13 inside ft6636_init).
-    ft6636_init();
-
-    // LVGL
     lv_init();
     lv_tick_set_cb(my_tick);
 
-    buf1 = (uint16_t*)heap_caps_malloc(LCD_WIDTH * BUF_LINES * 2, MALLOC_CAP_SPIRAM);
-    buf2 = (uint16_t*)heap_caps_malloc(LCD_WIDTH * BUF_LINES * 2, MALLOC_CAP_SPIRAM);
-    if (!buf1 || !buf2) {
-        Serial.println("FATAL: LVGL draw buffer alloc failed (PSRAM?)");
-        while (true) { delay(1000); }
-    }
+    buf1 = (uint16_t*)heap_caps_malloc(W * BUF_LINES * 2, LV_BUF_CAPS);
+    buf2 = (uint16_t*)heap_caps_malloc(W * BUF_LINES * 2, LV_BUF_CAPS);
 
-    lv_display_t* disp = lv_display_create(LCD_WIDTH, LCD_HEIGHT);
+    lv_display_t* disp = lv_display_create(W, H);
     lv_display_set_color_format(disp, LV_COLOR_FORMAT_RGB565);
     lv_display_set_flush_cb(disp, my_flush_cb);
-    lv_display_set_buffers(disp, buf1, buf2, LCD_WIDTH * BUF_LINES * 2,
+    lv_display_set_buffers(disp, buf1, buf2, W * BUF_LINES * 2,
                            LV_DISPLAY_RENDER_MODE_PARTIAL);
+    lv_display_add_event_cb(disp, rounder_cb, LV_EVENT_INVALIDATE_AREA, NULL);
 
     lv_indev_t* indev = lv_indev_create();
     lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(indev, my_touch_cb);
 
     ble_init();
-    buttons_init();
+    input_hal_init();
 
     ui_init();
     ui_update_ble_status(ble_get_state(), ble_get_device_name(), ble_get_mac_address());
-    ui_update_battery(power_battery_pct(), power_is_charging());
+    ui_update_battery(power_hal_battery_pct(), power_hal_is_charging());
     ui_show_screen(SCREEN_SPLASH);
 
-    Serial.println("Dashboard ready, waiting for data on BLE...");
+    Serial.printf("Dashboard ready (%s, %dx%d), waiting for data on BLE...\n",
+        board_caps().name, W, H);
 }
 
 static ble_state_t last_ble_state = BLE_STATE_INIT;
 
+// Hold-to-pair gesture: hold the PWR button ~3s, then RELEASE → clear all BLE
+// bonds and re-advertise. Clearing on *release* (not while held) is deliberate:
+// holding to power the device OFF (AXP hardware shutdown at 8s) must not wipe
+// the bond — a power-off hold never releases before shutdown. To stop a
+// "chicken-out" release just before 8s from pairing, the gesture disarms at 6s.
+//
+//   ~1.5s long-press edge → PENDING
+//   3.0s (+1500)          → ARMED   (release from here clears bonds)
+//   6.0s (+4500)          → DISARMED (no clear; AXP powers off at 8s)
+#define PAIR_ARM_AFTER_LONG_MS    1500   // 3.0s total
+#define PAIR_DISARM_AFTER_LONG_MS 4500   // 6.0s total
+
+// UI_NAV releases shorter than this are a nav tap; anything longer is the
+// hold-to-pair gesture (matches the boards' PWR_LONG_MS threshold).
+#define UI_NAV_SHORT_MS           1500
+enum pair_state_t { PAIR_IDLE, PAIR_PENDING, PAIR_ARMED };
+static pair_state_t pair_state        = PAIR_IDLE;
+static uint32_t     pair_long_seen_ms = 0;
+
+static void pair_tick(void) {
+    if (pair_state == PAIR_IDLE && power_hal_pwr_long_pressed()) {
+        pair_state = PAIR_PENDING;
+        pair_long_seen_ms = millis();
+        (void)power_hal_pwr_released();  // drain any stale release edge
+        Serial.println("PWR long-press: hold to ~3s then release to pair");
+        return;
+    }
+    if (pair_state == PAIR_IDLE) return;
+
+    if (power_hal_pwr_released()) {
+        if (pair_state == PAIR_ARMED) {
+            Serial.println("Pair: released in window — clearing bonds, advertising");
+            ble_clear_bonds();
+        } else {
+            Serial.println("Pair: released too early — cancelled");
+        }
+        pair_state = PAIR_IDLE;
+        return;
+    }
+
+    uint32_t held = millis() - pair_long_seen_ms;
+    if (pair_state == PAIR_PENDING && held >= PAIR_ARM_AFTER_LONG_MS) {
+        pair_state = PAIR_ARMED;
+        Serial.println("Pair: armed — release to pair");
+    } else if (pair_state == PAIR_ARMED && held >= PAIR_DISARM_AFTER_LONG_MS) {
+        pair_state = PAIR_IDLE;  // power-off territory; don't pair
+        Serial.println("Pair: disarmed (holding toward power-off)");
+    }
+}
+
 void loop() {
-    touch_read();
+    idle_tick();
     lv_timer_handler();
     ui_tick_anim();
     ble_tick();
-    power_tick();
-    buttons_tick();
+    power_hal_tick();
+    imu_hal_tick();
+    sound_hal_tick();
     splash_tick();
+    // Rotation transition (blank + ramp) would fight the idle fade — skip
+    // ticks while the panel is dark. A rotation that happens during sleep
+    // is detected by the next tick after wake and ramped in then.
+    if (!idle_is_asleep()) display_hal_tick();
 
-    // HID keyboard input. One key held at a time (the BLE HID report model
-    // here carries a single keycode+modifier). Per btn_id_t order:
-    //   UP/DOWN/LEFT/RIGHT → arrow keys, SELECT → Enter,
-    //   L1 → Shift+Tab, R2 → Space.
-    // BOOT_BTN does UI nav (cycle screen / next splash anim) — not HID.
+    // ---- Physical buttons ----
+    //   PRIMARY   → HID Space  (Claude Code voice-mode PTT)
+    //   SECONDARY → HID Shift+Tab  (mode toggle; only if the board has one)
+    //   PWR       → on splash: cycle animations; on usage: cycle brightness;
+    //               hold ~3s + release: pairing mode
+    // First press from sleep is consumed as a wake-only event by
+    // idle_consume_wake_press(); the normal action fires from the second
+    // press. Activity bookkeeping happens inside idle_consume_wake_press
+    // so no separate idle_note_activity() call is needed here.
     {
-        struct HidMap { uint8_t key; uint8_t mod; };
-        static const HidMap hid[BTN_HID_COUNT] = {
-            [BTN_UP]     = { 0x52, 0x00 },  // Up Arrow
-            [BTN_DOWN]   = { 0x51, 0x00 },  // Down Arrow
-            [BTN_LEFT]   = { 0x50, 0x00 },  // Left Arrow
-            [BTN_RIGHT]  = { 0x4F, 0x00 },  // Right Arrow
-            [BTN_SELECT] = { 0x28, 0x00 },  // Enter / Return
-            [BTN_L1]     = { 0x2B, 0x02 },  // Tab + LEFT_SHIFT
-            [BTN_R2]     = { 0x2C, 0x00 },  // Space
-        };
-        static int held = -1;  // index of the currently-held HID button
+        static bool primary_was = false;
+        static bool primary_wake_swallowed = false;
+        bool primary_now = input_hal_is_held(INPUT_BTN_PRIMARY);
+        if (primary_now != primary_was) {
+            if (primary_now) {
+                if (idle_consume_wake_press()) primary_wake_swallowed = true;
+                else                            ble_keyboard_press(0x2C, 0);  // HID Space, no mods
+            } else {
+                if (primary_wake_swallowed) primary_wake_swallowed = false;
+                else                        ble_keyboard_release();
+            }
+            primary_was = primary_now;
+        }
 
-        if (held >= 0) {
-            if (!buttons_down((btn_id_t)held)) {
-                ble_keyboard_release();
-                held = -1;
+        if (board_caps().button_count >= 2) {
+            static bool secondary_was = false;
+            static bool secondary_wake_swallowed = false;
+            bool secondary_now = input_hal_is_held(INPUT_BTN_SECONDARY);
+            if (secondary_now != secondary_was) {
+                if (secondary_now) {
+                    if (idle_consume_wake_press()) secondary_wake_swallowed = true;
+                    else                            ble_keyboard_press(0x2B, 0x02);  // HID Tab + LEFT_SHIFT
+                } else {
+                    if (secondary_wake_swallowed) secondary_wake_swallowed = false;
+                    else                          ble_keyboard_release();
+                }
+                secondary_was = secondary_now;
             }
         }
-        if (held < 0) {
-            for (int i = 0; i < BTN_HID_COUNT; i++) {
-                if (buttons_down((btn_id_t)i)) {
-                    ble_keyboard_press(hid[i].key, hid[i].mod);
-                    held = i;
+
+        // Attaky Core exposes a richer HID surface through its D-pad and
+        // shoulder/select keys. Reference upstream boards return false for
+        // these extended buttons, so polling them here is behavior-neutral.
+        {
+            struct HidMap { InputButton btn; uint8_t key; uint8_t mod; };
+            static const HidMap hid[] = {
+                { INPUT_BTN_UP,     0x52, 0x00 },  // Up Arrow
+                { INPUT_BTN_DOWN,   0x51, 0x00 },  // Down Arrow
+                { INPUT_BTN_LEFT,   0x50, 0x00 },  // Left Arrow
+                { INPUT_BTN_RIGHT,  0x4F, 0x00 },  // Right Arrow
+                { INPUT_BTN_SELECT, 0x28, 0x00 },  // Enter / Return
+                { INPUT_BTN_L1,     0x2B, 0x02 },  // Tab + LEFT_SHIFT
+                { INPUT_BTN_R2,     0x2C, 0x00 },  // Space
+            };
+            static int  held_idx = -1;
+            static bool sent_key = false;
+
+            if (held_idx >= 0 && !input_hal_is_held(hid[held_idx].btn)) {
+                if (sent_key) ble_keyboard_release();
+                held_idx = -1;
+                sent_key = false;
+            }
+            if (held_idx < 0) {
+                for (int i = 0; i < (int)(sizeof(hid) / sizeof(hid[0])); i++) {
+                    if (!input_hal_is_held(hid[i].btn)) continue;
+                    held_idx = i;
+                    if (!idle_consume_wake_press()) {
+                        ble_keyboard_press(hid[i].key, hid[i].mod);
+                        sent_key = true;
+                    }
                     break;
                 }
             }
         }
 
-        if (buttons_boot_pressed()) {
-            if (ui_get_current_screen() == SCREEN_SPLASH) splash_next();
-            else                                          ui_cycle_screen();
+        {
+            // Fires on SHORT release only: on boards where UI_NAV doubles
+            // as the hold-to-pair button (Attaky Core BOOT), a long hold
+            // belongs to pair_tick() and must not also toggle the screen.
+            static bool ui_nav_was = false;
+            static uint32_t ui_nav_press_ms = 0;
+            bool ui_nav_now = input_hal_is_held(INPUT_BTN_UI_NAV);
+            if (ui_nav_now && !ui_nav_was) {
+                ui_nav_press_ms = millis();
+            } else if (!ui_nav_now && ui_nav_was) {
+                if (millis() - ui_nav_press_ms < UI_NAV_SHORT_MS &&
+                    !idle_consume_wake_press()) {
+                    if (ui_get_current_screen() == SCREEN_SPLASH) splash_next();
+                    else                                          ui_toggle_splash();
+                }
+            }
+            ui_nav_was = ui_nav_now;
         }
+
+        if (power_hal_pwr_pressed()) {
+            if (!idle_consume_wake_press()) {
+                // On splash: cycle animations. On the usage view: cycle
+                // screen brightness (single non-splash view, no more screens).
+                if (ui_get_current_screen() == SCREEN_SPLASH) splash_next();
+                else                                          brightness_cycle();
+            }
+        }
+
+        pair_tick();
     }
 
-    // Update BLE status on screen when state changes
     ble_state_t bs = ble_get_state();
     if (bs != last_ble_state) {
         last_ble_state = bs;
         ui_update_ble_status(bs, ble_get_device_name(), ble_get_mac_address());
     }
 
-    // Update battery indicator
-    static int last_pct = -2;
+    static int  last_pct      = -2;
     static bool last_charging = false;
-    int pct = power_battery_pct();
-    bool charging = power_is_charging();
+    int  pct      = power_hal_battery_pct();
+    bool charging = power_hal_is_charging();
     if (pct != last_pct || charging != last_charging) {
         last_pct = pct;
         last_charging = charging;
@@ -278,8 +430,15 @@ void loop() {
     if (ble_has_data()) {
         if (parse_json(ble_get_data(), &usage)) {
             int g_before = usage_rate_group();
-            usage_rate_sample(usage.session_pct);
+            bool session_reset = usage_rate_sample(usage.session_pct);
             int g_after = usage_rate_group();
+            // 5-hour session limit refilled → chime so the user knows they can
+            // use Claude again (no-op on boards without a buzzer). Gated on the
+            // daemon's opt-in `chime` config; the `buzz` serial cmd ignores it.
+            if (session_reset && usage.chime) {
+                Serial.println("session reset detected — chime");
+                sound_hal_play_reset();
+            }
             if (g_after != g_before) {
                 Serial.printf("usage rate: group %d -> %d (s=%.2f%%)\n",
                     g_before, g_after, usage.session_pct);
