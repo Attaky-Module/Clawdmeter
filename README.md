@@ -75,279 +75,60 @@ board-HAL layout (`firmware/src/boards/attaky_core_esp32/` + the
 polling, BLE protocol, splash animation logic) is unchanged and future
 upstream updates stay easy to merge.
 
-## Build & flash
-
-This is a fork — clone **this** repository (not the upstream
-`HermannBjorgvin/Clawdmeter`) to get the Attaky Core build target:
-
-```sh
-git clone https://github.com/Attaky-Module/Clawdmeter.git
-cd Clawdmeter
-```
-
-Prerequisites:
-
-- Linux (tested on Ubuntu) or macOS
-- [PlatformIO CLI](https://docs.platformio.org/en/latest/core/installation/index.html)
-- A CH340 USB-serial driver (most current macOS/Linux ship one)
-- Linux: `curl`, `bluetoothctl`, `busctl` (BlueZ Bluetooth stack)
-- macOS: `python3` (the installer sets up a venv with `bleak` and `httpx`)
-- Claude Code with an active subscription
-
-Build with `pio run -d firmware -e attaky_core_esp32`; flashing runs
-at 460800 baud (the USB-serial bridge is not reliable at 921600). Full
-flash + pairing + daemon setup is per-OS below.
-
-## macOS installation
-
-### Flash the firmware
-
-The Core enumerates as `/dev/cu.usbserial-*` (not `/dev/cu.usbmodem*`):
-
-```bash
-./flash-mac.sh attaky_core_esp32                          # auto-detects /dev/cu.usbserial-*
-./flash-mac.sh attaky_core_esp32 /dev/cu.usbserial-2120   # or pass an explicit port
-```
-
-The board env name is required — run `./flash-mac.sh` with no args to
-list the available envs.
-
-### Pair the device
-
-After flashing, open **System Settings → Bluetooth** and click
-*Connect* next to **"Attaky Claude Monitor"**. The daemon discovers it on
-its next scan (~30 s).
-
-To make the device forget its bond (e.g. to move it to another
-computer), hold the **BOOT** button for 3 seconds and release — the
-device clears its saved bond and re-advertises. macOS will then refuse
-to auto-reconnect with *"Peer removed pairing information"*; that is
-expected — *Forget* "Attaky Claude Monitor" in System Settings →
-Bluetooth, then connect again.
-
-### Install the daemon
-
-The daemon reads your Claude OAuth token from the macOS Keychain
-(service `Claude Code-credentials`), polls usage every 60 s, and pushes
-it to the display over BLE.
-
-```bash
-./install-mac.sh
-```
-
-The installer creates a Python venv in `daemon/.venv/`, installs
-`bleak` and `httpx`, renders a LaunchAgent into
-`~/Library/LaunchAgents/com.user.claude-usage-daemon.plist`, and loads
-it. The first run is launched interactively so macOS prompts for
-Bluetooth permission.
-
-Useful commands:
-
-```bash
-launchctl list | grep claude-usage                                          # check it's running
-tail -F ~/Library/Logs/claude-usage-daemon.out.log                          # live logs
-launchctl unload ~/Library/LaunchAgents/com.user.claude-usage-daemon.plist  # stop
-launchctl load -w ~/Library/LaunchAgents/com.user.claude-usage-daemon.plist # start
-```
-
-## Linux installation
-
-### Flash the firmware
-
-The Core enumerates as `/dev/ttyUSB0` (not `/dev/ttyACM0`):
-
-```bash
-./flash.sh attaky_core_esp32                 # auto-picks /dev/ttyACM0, else /dev/ttyUSB0
-./flash.sh attaky_core_esp32 /dev/ttyUSB1    # or pass an explicit port
-```
-
-### Pair the device
-
-After flashing, the device advertises as **"Attaky Claude Monitor"**. Pair
-it once:
-
-```bash
-# Scan for the device
-bluetoothctl scan le
-
-# When "Attaky Claude Monitor" appears, pair and trust it
-bluetoothctl pair AA:BB:CC:DD:EE:FF    # use your device's MAC
-bluetoothctl trust AA:BB:CC:DD:EE:FF
-```
-
-The device's MAC shows up in the `bluetoothctl scan le` output next to
-the advertised name (it is also printed on the serial console at boot).
-To re-pair later, hold the **BOOT** button for 3 seconds then release —
-the device clears its saved bond and re-advertises.
-
-### Install the daemon
-
-The daemon polls your Claude usage every 60 seconds and sends it to the
-display over BLE.
-
-```bash
-./install.sh
-systemctl --user start claude-usage-daemon
-```
-
-Check status: `systemctl --user status claude-usage-daemon`
-
-View logs: `journalctl --user -u claude-usage-daemon -f`
-
-## Screens
-
-The device boots into the splash. Tap the screen anywhere to flip
-between the splash and the Usage view. The **BOOT** button steps to the
-next animation while the splash is up, and returns to the splash from
-the Usage view. The firmware also auto-rotates every 20 s within the
-current usage-rate group, so a long stretch on the splash isn't just
-one Clawd on loop.
-
-Connection status lives on the Usage view; when the device is unpaired
-it shows a pairing hint instead of usage data. A short press of the
-**POWER** button cycles screen brightness (on the splash it cycles
-animations).
-
-## How it works
-
-1. The daemon reads your Claude Code OAuth token (macOS Keychain, or
-   `~/.claude/.credentials.json` on Linux).
-2. It makes a minimal API call to `api.anthropic.com/v1/messages` — one
-   token of Haiku, basically free.
-3. The usage numbers come straight out of the response headers
-   (`anthropic-ratelimit-unified-5h-utilization` and friends).
-4. The daemon connects to the ESP32 over BLE and writes a JSON payload
-   to the GATT RX characteristic.
-5. The firmware parses it and updates the LVGL dashboard.
-6. The firmware tracks the rate of change of session % over a 5-minute
-   window and picks splash animations from the matching mood group.
-7. The physical keys are independent of all of this — they emit BLE HID
-   keyboard reports to the paired host directly (see below).
-
-## Physical buttons
-
-The keys send standard BLE HID keyboard reports, so they act on
-whatever window has focus on the paired host — not just Claude Code.
-
-| Key            | Function                                        |
-| -------------- | ----------------------------------------------- |
-| **D-pad ↑↓←→** | Arrow keys                                      |
-| **SELECT**     | Enter / confirm                                 |
-| **L1**         | Shift+Tab (Claude Code mode toggle)             |
-| **R2**         | Space (Claude Code voice-mode push-to-talk)     |
-| **BOOT**       | Short: next animation on splash, back to splash from Usage · hold 3 s + release: clear bond / pairing mode |
-| **POWER**      | Short: cycle brightness (cycle animations on splash) |
-
-The D-pad, SELECT, L1 and R2 keys are read through the on-board I²C IO
-expander; BOOT is a dedicated GPIO. A long press of the hardware POWER
-button is a power toggle handled below the firmware — the firmware only
-ever sees POWER short-presses, which is why hold-to-pair lives on BOOT.
-
-## BLE protocol
-
-The device advertises a custom GATT service alongside the standard HID
-keyboard service:
-
-|                            | UUID                                   |
-| -------------------------- | -------------------------------------- |
-| **Data Service**           | `4c41555a-4465-7669-6365-000000000001` |
-| RX Characteristic (write)  | `4c41555a-4465-7669-6365-000000000002` |
-| TX Characteristic (notify) | `4c41555a-4465-7669-6365-000000000003` |
-| REQ Characteristic (notify)| `4c41555a-4465-7669-6365-000000000004` |
-| **HID Service**            | `00001812-0000-1000-8000-00805f9b34fb` |
-
-JSON payload format (written to RX):
-
-```json
-{ "s": 45, "sr": 120, "w": 28, "wr": 7200, "st": "allowed", "ok": true }
-```
-
-Fields: `s` = session %, `sr` = session reset (minutes), `w` = weekly %,
-`wr` = weekly reset (minutes), `st` = status, `ok` = success flag.
-
-## Recompiling fonts
-
-The `firmware/src/font_*.c` files are pre-compiled LVGL bitmap fonts
-shared by all board sizes (Serif 56/34; Sans 48/28/24/20/16/14;
-Mono 32/18). All three source typefaces are freely licensed — Source
-Serif 4 (display serif) and Archivo (UI sans) under the SIL OFL 1.1
-(license texts in `assets/`), DejaVu Sans Mono under the
-DejaVu/Bitstream Vera license. You only need this section if you want
-to change the sizes.
-
-```bash
-npm install -g lv_font_conv
-```
-
-Generate with `--no-compress` (required for LVGL 9), e.g.:
-
-```bash
-for size in 56 34; do
-  lv_font_conv --font assets/SourceSerif4-Regular.ttf -r 0x20-0x7E \
-    --size $size --format lvgl --bpp 4 --no-compress \
-    -o firmware/src/font_serif_${size}.c --lv-include "lvgl.h"
-done
-
-for size in 48 28 24 20 16 14; do
-  lv_font_conv --font assets/Archivo-Regular.ttf -r 0x20-0x7E \
-    --size $size --format lvgl --bpp 4 --no-compress \
-    -o firmware/src/font_sans_${size}.c --lv-include "lvgl.h"
-done
-
-for size in 32 18; do
-  lv_font_conv --font assets/DejaVuSansMono.ttf \
-    -r 0x20-0x7E,0xB7,0x2026,0x2722,0x2733,0x2736,0x273B,0x273D \
-    --size $size --format lvgl --bpp 4 --no-compress \
-    -o firmware/src/font_mono_${size}.c --lv-include "lvgl.h"
-done
-```
-
-**Important:** `lv_font_conv` v1.5.3 outputs LVGL 8 format. Each
-generated file must be patched for LVGL 9 compatibility:
-
-1. Remove `#if LVGL_VERSION_MAJOR >= 8` guards around `font_dsc` and the font struct
-2. Remove the `.cache` field from `font_dsc`
-3. Add `.release_glyph = NULL`, `.kerning = 0`, `.static_bitmap = 0` to the font struct
-4. Add `.fallback = NULL`, `.user_data = NULL` to the font struct
-
-Without these patches, fonts compile but render as invisible.
-
-## Converting icons
-
-The UI uses a small set of [Lucide](https://lucide.dev) icons
-(bluetooth + battery states) plus the logo, converted to RGB565 /
-RGB565A8 C arrays for LVGL. The converter needs `pngjs`:
-
-```bash
-cd tools && npm install && cd ..
-node tools/png_to_lvgl.js assets/icon_bluetooth_48.png icon_bluetooth_data ICON_BLUETOOTH_WIDTH ICON_BLUETOOTH_HEIGHT
-```
-
-Default tint is white (`0xFFFFFF`); Lucide PNGs ship as
-black-on-transparent and would render invisible against the dark UI
-without it. Pass `--no-tint` for pre-coloured artwork like the logo
-(regenerated at 36×36 for the smaller screen). Battery icons use
-RGB565A8 (alpha plane) so they blend cleanly over the splash; the rest
-are baked RGB565 over the panel colour. Paste the converter output into
-`firmware/src/icons.h` (or `logo.h` for the logo).
-
-## Splash animations
-
-The animations come from [claudepix.vercel.app](https://claudepix.vercel.app),
-a library of Clawd sprites. `tools/scrape_claudepix.js` evaluates the
-site's JavaScript in a Node VM to pull out frame data and palettes,
-then `tools/convert_to_c.js` turns everything into RGB565 C arrays and
-writes `firmware/src/splash_animations.h`.
-
-To re-pull (e.g. when the source library updates):
-
-```bash
-node tools/scrape_claudepix.js
-node tools/convert_to_c.js
-pio run -d firmware -t upload
-```
-
-See `tools/README.md` for details.
+## Using this fork on Attaky Core
+
+Everything general — daemon install (macOS / Linux / Windows), how it
+works, the BLE protocol, icon + splash tooling — is documented in the
+[upstream README below](#-upstream-clawdmeter-readme-). The Attaky
+deltas are:
+
+- **Clone this repository** (not the upstream one) and build the
+  Attaky env: `pio run -d firmware -e attaky_core_esp32`.
+- **Flash** with the same helper scripts, passing the Attaky env:
+  `./flash-mac.sh attaky_core_esp32 [port]` on macOS,
+  `./flash.sh attaky_core_esp32 [port]` on Linux. The board's USB
+  bridge is a CH340 (driver ships with current macOS/Linux), so the
+  port is `/dev/cu.usbserial-*` / `/dev/ttyUSB0` — not the
+  `usbmodem`/`ttyACM` names upstream boards use — and flashing runs at
+  460800 baud.
+- **Device name**: this build advertises as **"Attaky Claude
+  Monitor"**, which is also the daemon default — follow the upstream
+  pairing steps with that name (upstream Waveshare builds set
+  `CLAWDMETER_DEVICE_NAME=Clawdmeter` instead).
+- **Re-pair / clear the bond** by holding **BOOT** for 3 seconds and
+  releasing. Upstream's "hold the power button" instruction does not
+  apply here: Attaky Core's POWER long-hold is a hardware power toggle
+  the firmware never sees, so the pairing gesture lives on BOOT (the
+  on-device hint says so too). After clearing, *Forget* the device in
+  your OS Bluetooth settings before reconnecting.
+- **Buttons** — Attaky Core has a D-pad and more keys than the
+  upstream boards; they act as a BLE HID keyboard on whatever window
+  has focus:
+
+  | Key            | Function                                    |
+  | -------------- | ------------------------------------------- |
+  | **D-pad ↑↓←→** | Arrow keys                                  |
+  | **SELECT**     | Enter / confirm                             |
+  | **L1**         | Shift+Tab (Claude Code mode toggle)         |
+  | **R2**         | Space (Claude Code voice-mode push-to-talk) |
+  | **BOOT**       | Next animation on splash, back to splash from Usage · hold 3 s + release: pairing mode |
+  | **POWER**      | Short: cycle brightness (next animation on splash) |
+
+  A long press of POWER is the hardware power toggle, handled below
+  the firmware.
+- **Fonts**: the UI is built on freely licensed typefaces — Source
+  Serif 4 and Archivo (SIL OFL 1.1; license texts at
+  `assets/OFL-SourceSerif4.txt` and `assets/OFL-Archivo.txt`) plus
+  DejaVu Sans Mono (mono 32/18). The upstream font-recompile section
+  below still names the proprietary fonts it was written for; on this
+  tree use `assets/SourceSerif4-Regular.ttf` (serif 56/34) and
+  `assets/Archivo-Regular.ttf` (sans 48/28/24/20/16/14) with the same
+  `lv_font_conv` flags.
+- **BLE protocol note**: in addition to the Data/RX/TX characteristics
+  in the upstream table below, the firmware exposes a REQ notify
+  characteristic (`4c41555a-4465-7669-6365-000000000004`) that fires a
+  refresh request when a subscriber connects before any data has
+  arrived.
 
 ## Credits
 
