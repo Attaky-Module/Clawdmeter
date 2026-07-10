@@ -200,9 +200,12 @@ Fields: `s` = session %, `sr` = session reset (minutes), `w` = weekly %,
 ## Recompiling fonts
 
 The `firmware/src/font_*.c` files are pre-compiled LVGL bitmap fonts.
-The 320×240 build uses the smaller sizes already in the repo
-(Tiempos 34; Styrene 24/20/16/14/12; Mono 18). You only need this
-section if you want to change the sizes.
+The 320×240 build uses the sizes already in the repo
+(Serif 34; Sans 28/16/14/12; Mono 18). All three source typefaces are
+freely licensed — Source Serif 4 (display serif) and Archivo (UI sans)
+under the SIL OFL 1.1 (license texts in `assets/`), DejaVu Sans Mono
+under the DejaVu/Bitstream Vera license. You only need this section if
+you want to change the sizes.
 
 ```bash
 npm install -g lv_font_conv
@@ -213,14 +216,14 @@ loop-driven invocations) with `--no-compress` (required for LVGL 9),
 e.g.:
 
 ```bash
-lv_font_conv --font assets/TiemposText-400-Regular.otf -r 0x20-0x7E \
+lv_font_conv --font assets/SourceSerif4-Regular.ttf -r 0x20-0x7E \
   --size 34 --format lvgl --bpp 4 --no-compress \
-  -o firmware/src/font_tiempos_34.c --lv-include "lvgl.h"
+  -o firmware/src/font_serif_34.c --lv-include "lvgl.h"
 
-for size in 24 20 16 14 12; do
-  lv_font_conv --font assets/StyreneB-Regular.otf -r 0x20-0x7E \
+for size in 28 16 14 12; do
+  lv_font_conv --font assets/Archivo-Regular.ttf -r 0x20-0x7E \
     --size $size --format lvgl --bpp 4 --no-compress \
-    -o firmware/src/font_styrene_${size}.c --lv-include "lvgl.h"
+    -o firmware/src/font_sans_${size}.c --lv-include "lvgl.h"
 done
 
 lv_font_conv --font assets/DejaVuSansMono.ttf \
@@ -285,14 +288,16 @@ See `tools/README.md` for details.
 - Pixel-art Clawd animation by @amaanbuilds. Frame data and palettes
   scraped + converted by the tooling in `tools/`.
 - Lucide icon set (MIT) for the bluetooth and battery UI glyphs.
-- Anthropic brand fonts (Tiempos Text, Styrene B) — see the licensing
-  warning below.
+- UI typefaces: Source Serif 4 (Adobe, SIL OFL 1.1), Archivo
+  (Omnibus-Type, SIL OFL 1.1) and DejaVu Sans Mono (Bitstream Vera
+  license). OFL license texts ship in `assets/`.
 
 ## Licensing gray area warning
 
-The following is the original author's statement and applies equally to
-this fork, which still bundles the same proprietary fonts and the
-copyrighted Clawd mascot:
+Unlike upstream, this fork does NOT bundle Anthropic's proprietary
+brand fonts (Tiempos Text, Styrene B) — the UI was rebuilt on the
+freely licensed typefaces listed above. The remaining gray area is the
+Clawd mascot artwork. The original author's statement:
 
 > The software in this repository uses and adheres to the Anthropic
 > brand guidelines and uses the same proprietary fonts that Anthropic
@@ -303,5 +308,6 @@ copyrighted Clawd mascot:
 > proprietary fonts and copyrighted assets. Please be aware of this if
 > you fork or copy the code from this repo. **You have been warned!**
 
-This Attaky fork inherits the same constraint: the proprietary fonts
-and copyrighted Clawd assets are included as-is and are not relicensed.
+For this fork the font half of that warning no longer applies; the
+copyrighted Clawd mascot assets are still included as-is and are not
+relicensed.

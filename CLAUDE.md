@@ -37,7 +37,7 @@ ble.{h,cpp}     — NimBLE peripheral: custom data service + HID keyboard
 data.h          — UsageData struct
 icons.h         — icon arrays. Battery (5×) are RGB565A8 with alpha; rest are raw RGB565.
 logo.h          — RGB565 logo
-font_*.c        — pre-compiled LVGL 9 bitmap fonts (Tiempos 56, Styrene 48/28/24/20, Mono 32)
+font_*.c        — pre-compiled LVGL 9 bitmap fonts (Serif 34 = Source Serif 4, Sans 28/16/14/12 = Archivo, Mono 18 = DejaVu; all freely licensed)
 splash_animations.h — generated, do not hand-edit
 ```
 

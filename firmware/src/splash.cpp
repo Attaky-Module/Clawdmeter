@@ -16,7 +16,7 @@
 // Background fallback when palette is missing
 #define COL_EMPTY    0x0000  // true black (matches THEME_BG)
 
-LV_FONT_DECLARE(font_styrene_16);
+LV_FONT_DECLARE(font_sans_16);
 
 static lv_obj_t *splash_container = NULL;
 static lv_obj_t *canvas = NULL;
@@ -119,7 +119,7 @@ void splash_init(lv_obj_t *parent) {
         "no animations loaded\n\n"
         "run tools/scrape_claudepix.js\n"
         "then tools/convert_to_c.js");
-    lv_obj_set_style_text_font(label_status, &font_styrene_16, 0);
+    lv_obj_set_style_text_font(label_status, &font_sans_16, 0);
     lv_obj_set_style_text_color(label_status, lv_color_hex(0xb0aea5), 0);
     lv_obj_set_style_text_align(label_status, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_center(label_status);
