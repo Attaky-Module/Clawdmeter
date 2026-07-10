@@ -31,7 +31,7 @@ Boards supported out of the box:
 - [Waveshare ESP32-C6-Touch-AMOLED-2.16](https://www.waveshare.com/esp32-c6-touch-amoled-2.16.htm?&aff_id=149786) 
 - [Waveshare ESP32-S3-Touch-AMOLED-1.8](https://www.waveshare.com/esp32-s3-touch-amoled-1.8.htm?&aff_id=149786)
 - [Waveshare ESP32-C6-Touch-AMOLED-1.8](https://www.waveshare.com/esp32-c6-touch-amoled-1.8.htm?&aff_id=149786)
-- Attaky Core ESP32 (`attaky_core_esp32`) — ST7789 320x240 landscape, FT6636 touch, AW9523 button expander, and MAX17048 battery gauge. This build advertises as **"Attaky Claude Monitor"**.
+- Attaky Core ESP32 (`attaky_core_esp32`) — 320x240 landscape TFT with capacitive touch, IO-expander buttons, and a battery fuel gauge. This build advertises as **"Attaky Claude Monitor"**.
 
 > Please check if a pull request exists for your alternative hardware port before opening a new one, providing QA feedback and testing on the same hardware is more valuable than duplicate pull requests.
 
@@ -249,17 +249,23 @@ npm install -g lv_font_conv
 
 Generate each one (one at a time — `lv_font_conv` doesn't like loop-driven invocations) with `--no-compress` (required for LVGL 9):
 
-```bash
-# Tiempos Text (titles, 56px)
-lv_font_conv --font assets/TiemposText-400-Regular.otf -r 0x20-0x7E \
-  --size 56 --format lvgl --bpp 4 --no-compress \
-  -o firmware/src/font_tiempos_56.c --lv-include "lvgl.h"
+All bundled typefaces are freely licensed — Source Serif 4 (display
+serif) and Archivo (UI sans) under the SIL OFL 1.1 (license texts in
+`assets/`), DejaVu Sans Mono under the DejaVu/Bitstream Vera license.
 
-# Styrene B (large numbers 48, panel labels 28, small text 24, minimal 20)
-for size in 48 28 24 20; do
-  lv_font_conv --font assets/StyreneB-Regular.otf -r 0x20-0x7E \
+```bash
+# Source Serif 4 (titles: 56px large boards, 34px 320x240 boards)
+for size in 56 34; do
+  lv_font_conv --font assets/SourceSerif4-Regular.ttf -r 0x20-0x7E \
     --size $size --format lvgl --bpp 4 --no-compress \
-    -o firmware/src/font_styrene_${size}.c --lv-include "lvgl.h"
+    -o firmware/src/font_serif_${size}.c --lv-include "lvgl.h"
+done
+
+# Archivo (numbers, labels and small text at per-board sizes)
+for size in 48 28 24 20 16 14; do
+  lv_font_conv --font assets/Archivo-Regular.ttf -r 0x20-0x7E \
+    --size $size --format lvgl --bpp 4 --no-compress \
+    -o firmware/src/font_sans_${size}.c --lv-include "lvgl.h"
 done
 
 # DejaVu Sans Mono (32px, with spinner Unicode chars)
@@ -310,8 +316,10 @@ See `tools/README.md` for details.
 
 - Pixel-art Clawd animation by [@amaanbuilds](https://x.com/amaanbuilds), sourced from [claudepix.vercel.app](https://claudepix.vercel.app). Frame data and palettes scraped + converted by the tooling in `tools/`.
 - Lucide icon set ([lucide.dev](https://lucide.dev), MIT) for bluetooth and battery UI glyphs.
-- Anthropic brand fonts (Tiempos Text, Styrene B) — see licensing warning below.
+- UI typefaces: Source Serif 4 (Adobe, SIL OFL 1.1), Archivo (Omnibus-Type, SIL OFL 1.1) and DejaVu Sans Mono (Bitstream Vera license). OFL license texts ship in `assets/`.
 
 ## Licensing gray area warning
+
+This tree no longer bundles Anthropic's proprietary brand fonts (Tiempos Text, Styrene B); the UI is built on the freely licensed typefaces listed above. The remaining gray area is the copyrighted Clawd mascot artwork. The original author's statement:
 
 The software in this repository uses and adheres to the Anthropic brand guidelines and uses the same proprietary fonts that Anthropic has a license for but this software uses without permission as well as using assets from Anthropic such as the copyrighted Clawd mascot so even though the code in this repo is non-proprietary I will not license it myself under a copyleft license since this repo includes proprietary fonts and copyrighted assets. Please be aware of this if you fork or copy the code from this repo. **You have been warned!**

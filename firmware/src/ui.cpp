@@ -7,14 +7,14 @@
 #include "hal/board_caps.h"
 
 // Custom fonts (scaled for 314 PPI, ~1.9x from original 165 PPI)
-LV_FONT_DECLARE(font_tiempos_56);
-LV_FONT_DECLARE(font_tiempos_34);
-LV_FONT_DECLARE(font_styrene_48);
-LV_FONT_DECLARE(font_styrene_28);
-LV_FONT_DECLARE(font_styrene_24);
-LV_FONT_DECLARE(font_styrene_20);
-LV_FONT_DECLARE(font_styrene_16);
-LV_FONT_DECLARE(font_styrene_14);
+LV_FONT_DECLARE(font_serif_56);
+LV_FONT_DECLARE(font_serif_34);
+LV_FONT_DECLARE(font_sans_48);
+LV_FONT_DECLARE(font_sans_28);
+LV_FONT_DECLARE(font_sans_24);
+LV_FONT_DECLARE(font_sans_20);
+LV_FONT_DECLARE(font_sans_16);
+LV_FONT_DECLARE(font_sans_14);
 LV_FONT_DECLARE(font_mono_32);
 LV_FONT_DECLARE(font_mono_18);
 
@@ -110,22 +110,22 @@ static void compute_layout(const BoardCaps& c) {
         L.battery_scale = 150;
         L.battery_w = 28;
         L.battery_y = 2;
-        L.usage_title_font = &font_tiempos_34;
-        L.usage_pct_font = &font_styrene_28;
-        L.usage_enterprise_pct_font = &font_tiempos_34;
-        L.usage_percent_font = &font_styrene_16;
-        L.usage_desc_font = &font_styrene_16;
-        L.usage_pace_font = &font_styrene_14;
-        L.usage_reset_font = &font_styrene_16;
-        L.usage_pill_font = &font_styrene_16;
+        L.usage_title_font = &font_serif_34;
+        L.usage_pct_font = &font_sans_28;
+        L.usage_enterprise_pct_font = &font_serif_34;
+        L.usage_percent_font = &font_sans_16;
+        L.usage_desc_font = &font_sans_16;
+        L.usage_pace_font = &font_sans_14;
+        L.usage_reset_font = &font_sans_16;
+        L.usage_pill_font = &font_sans_16;
         L.anim_font = &font_mono_18;
         L.bt_info_panel_h = 102;
         L.bt_reset_zone_h = 50;
-        L.bt_title_font    = &font_tiempos_34;
-        L.bt_status_font   = &font_styrene_28;
-        L.bt_device_font   = &font_styrene_16;
-        L.bt_credit_1_font = &font_styrene_14;
-        L.bt_credit_2_font = &font_styrene_14;
+        L.bt_title_font    = &font_serif_34;
+        L.bt_status_font   = &font_sans_28;
+        L.bt_device_font   = &font_sans_16;
+        L.bt_credit_1_font = &font_sans_14;
+        L.bt_credit_2_font = &font_sans_14;
     } else if (c.height >= 460) {
         // Large layout — tuned for 480x480 (AMOLED-2.16).
         L.margin = 20;
@@ -153,22 +153,22 @@ static void compute_layout(const BoardCaps& c) {
         L.battery_scale = 256;
         L.battery_w = 48;
         L.battery_y = L.title_y;
-        L.usage_title_font = &font_tiempos_56;
-        L.usage_pct_font = &font_styrene_48;
-        L.usage_enterprise_pct_font = &font_tiempos_56;
-        L.usage_percent_font = &font_styrene_28;
-        L.usage_desc_font = &font_styrene_28;
-        L.usage_pace_font = &font_styrene_16;
-        L.usage_reset_font = &font_styrene_28;
-        L.usage_pill_font = &font_styrene_28;
+        L.usage_title_font = &font_serif_56;
+        L.usage_pct_font = &font_sans_48;
+        L.usage_enterprise_pct_font = &font_serif_56;
+        L.usage_percent_font = &font_sans_28;
+        L.usage_desc_font = &font_sans_28;
+        L.usage_pace_font = &font_sans_16;
+        L.usage_reset_font = &font_sans_28;
+        L.usage_pill_font = &font_sans_28;
         L.anim_font = &font_mono_32;
         L.bt_info_panel_h = 160;
         L.bt_reset_zone_h = 110;
-        L.bt_title_font    = &font_tiempos_56;
-        L.bt_status_font   = &font_styrene_48;
-        L.bt_device_font   = &font_styrene_28;
-        L.bt_credit_1_font = &font_styrene_24;
-        L.bt_credit_2_font = &font_styrene_20;
+        L.bt_title_font    = &font_serif_56;
+        L.bt_status_font   = &font_sans_48;
+        L.bt_device_font   = &font_sans_28;
+        L.bt_credit_1_font = &font_sans_24;
+        L.bt_credit_2_font = &font_sans_20;
     } else {
         // Compact layout — tuned for 368x448 (AMOLED-1.8).
         L.margin = 20;
@@ -196,22 +196,22 @@ static void compute_layout(const BoardCaps& c) {
         L.battery_scale = 256;
         L.battery_w = 48;
         L.battery_y = L.title_y;
-        L.usage_title_font = &font_tiempos_56;
-        L.usage_pct_font = &font_styrene_48;
-        L.usage_enterprise_pct_font = &font_tiempos_56;
-        L.usage_percent_font = &font_styrene_28;
-        L.usage_desc_font = &font_styrene_28;
-        L.usage_pace_font = &font_styrene_16;
-        L.usage_reset_font = &font_styrene_28;
-        L.usage_pill_font = &font_styrene_28;
+        L.usage_title_font = &font_serif_56;
+        L.usage_pct_font = &font_sans_48;
+        L.usage_enterprise_pct_font = &font_serif_56;
+        L.usage_percent_font = &font_sans_28;
+        L.usage_desc_font = &font_sans_28;
+        L.usage_pace_font = &font_sans_16;
+        L.usage_reset_font = &font_sans_28;
+        L.usage_pill_font = &font_sans_28;
         L.anim_font = &font_mono_32;
         L.bt_info_panel_h = 140;
         L.bt_reset_zone_h = 90;
-        L.bt_title_font    = &font_tiempos_34;
-        L.bt_status_font   = &font_styrene_28;
-        L.bt_device_font   = &font_styrene_20;
-        L.bt_credit_1_font = &font_styrene_16;
-        L.bt_credit_2_font = &font_styrene_14;
+        L.bt_title_font    = &font_serif_34;
+        L.bt_status_font   = &font_sans_28;
+        L.bt_device_font   = &font_sans_20;
+        L.bt_credit_1_font = &font_sans_16;
+        L.bt_credit_2_font = &font_sans_14;
     }
 
     L.content_w = L.scr_w - 2 * L.margin;

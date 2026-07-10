@@ -73,7 +73,7 @@ firmware/src/
   data.h                    — UsageData struct
   icons.h                   — icon arrays. Battery (5×) are RGB565A8 with alpha; rest are raw RGB565.
   logo.h                    — 80×80 RGB565 logo
-  font_*.c                  — pre-compiled LVGL 9 bitmap fonts (Tiempos 56/34, Styrene 48/28/24/20/16/14/12, Mono 32/18)
+  font_*.c                  — pre-compiled LVGL 9 bitmap fonts (Serif 56/34 = Source Serif 4, Sans 48/28/24/20/16/14 = Archivo, Mono 32/18 = DejaVu; all freely licensed)
   splash_animations.h       — generated, do not hand-edit
 docs/porting/               — adding-a-board.md, hal-contract.md, capability-flags.md
 ```
