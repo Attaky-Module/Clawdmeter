@@ -2,7 +2,7 @@
 
 A small ESP32 dashboard I made for my desk to keep an eye on Claude Code usage.
 
-It runs on a [Waveshare ESP32-S3-Touch-AMOLED-2.16](https://www.waveshare.com/esp32-s3-touch-amoled-2.16.htm?&aff_id=149786) as well as a few other alternative boards and pairs over Bluetooth, the splash screen plays pixel-art Clawd animations that get
+It runs on Attaky Core ESP32, a [Waveshare ESP32-S3-Touch-AMOLED-2.16](https://www.waveshare.com/esp32-s3-touch-amoled-2.16.htm?&aff_id=149786), and a few other alternative boards. It pairs over Bluetooth, the splash screen plays pixel-art Clawd animations that get
 busier when your usage rate climbs. The two side buttons send Space and
 Shift+Tab over BLE HID for Claude Code's voice mode and mode-toggle shortcuts.
 
@@ -31,6 +31,7 @@ Boards supported out of the box:
 - [Waveshare ESP32-C6-Touch-AMOLED-2.16](https://www.waveshare.com/esp32-c6-touch-amoled-2.16.htm?&aff_id=149786) 
 - [Waveshare ESP32-S3-Touch-AMOLED-1.8](https://www.waveshare.com/esp32-s3-touch-amoled-1.8.htm?&aff_id=149786)
 - [Waveshare ESP32-C6-Touch-AMOLED-1.8](https://www.waveshare.com/esp32-c6-touch-amoled-1.8.htm?&aff_id=149786)
+- Attaky Core ESP32 (`attaky_core_esp32`) — ST7789 320x240 landscape, FT6636 touch, AW9523 button expander, and MAX17048 battery gauge. This build advertises as **"Attaky Claude Monitor"**.
 
 > Please check if a pull request exists for your alternative hardware port before opening a new one, providing QA feedback and testing on the same hardware is more valuable than duplicate pull requests.
 
@@ -52,6 +53,7 @@ The macOS host pieces — Python daemon, LaunchAgent, and flash helper — were 
 ### Flash the firmware
 
 ```bash
+./flash-mac.sh attaky_core_esp32 /dev/cu.usbserial-2120   # Attaky Core CH340X
 ./flash-mac.sh waveshare_amoled_216                       # auto-detects /dev/cu.usbmodem*
 ./flash-mac.sh waveshare_amoled_18  /dev/cu.usbmodem1101  # or pass an explicit USB serial port
 ```
@@ -60,7 +62,7 @@ The board env name is required. Run `./flash-mac.sh` with no args to see the ava
 
 ### Pair the device
 
-After flashing, open **System Settings → Bluetooth** and click *Connect* next to "Clawdmeter". The daemon only ever connects to the peripheral this Mac is paired/connected to — it never scans for a nearby device — so once it's connected here the daemon picks it up on its next poll (~60 s).
+After flashing, open **System Settings → Bluetooth** and click *Connect* next to the advertised device name. Attaky Core advertises as **"Attaky Claude Monitor"**; upstream Waveshare builds advertise as **"Clawdmeter"**. The daemon defaults to **"Attaky Claude Monitor"**; set `CLAWDMETER_DEVICE_NAME=Clawdmeter` before starting it if you are using an upstream Waveshare build. The daemon only ever connects to the peripheral this Mac is paired/connected to — it never scans for a nearby device — so once it's connected here the daemon picks it up on its next poll (~60 s).
 
 ### Install the daemon
 
@@ -86,6 +88,7 @@ launchctl load -w ~/Library/LaunchAgents/com.user.claude-usage-daemon.plist # st
 ### Flash the firmware
 
 ```bash
+./flash.sh attaky_core_esp32 /dev/ttyUSB0  # Attaky Core CH340X
 ./flash.sh waveshare_amoled_216                  # defaults to /dev/ttyACM0
 ./flash.sh waveshare_amoled_18  /dev/ttyACM1     # or pass an explicit USB serial port
 ```
@@ -94,18 +97,18 @@ The board env name is required. Run `./flash.sh` with no args to see the availab
 
 ### Pair the device
 
-After flashing, the device advertises as "Clawdmeter". Pair it once:
+After flashing, pair it once. Attaky Core advertises as **"Attaky Claude Monitor"**; upstream Waveshare builds advertise as **"Clawdmeter"**. The daemon defaults to **"Attaky Claude Monitor"**; set `CLAWDMETER_DEVICE_NAME=Clawdmeter` before starting it if you are using an upstream Waveshare build:
 
 ```bash
 # Scan for the device
 bluetoothctl scan le
 
-# When "Clawdmeter" appears, pair and trust it
+# When the advertised device name appears, pair and trust it
 bluetoothctl pair F4:12:FA:C0:8F:E5    # use your device's MAC
 bluetoothctl trust F4:12:FA:C0:8F:E5
 ```
 
-To re-pair later, hold the power button for 3 seconds then release — the device clears its saved bond and re-advertises.
+To re-pair later, hold the pairing button for 3 seconds then release — the device clears its saved bond and re-advertises. On the upstream Waveshare boards that is the power button; on Attaky Core it is the BOOT button (its power button is a hardware on/off switch).
 
 ### Install the daemon
 
@@ -134,14 +137,15 @@ Runs natively on Windows — no WSL required. A system-tray app polls your usage
 ### Flash the firmware
 
 ```powershell
-pio run -d firmware -e waveshare_amoled_216 -t upload --upload-port COM5   # use your device's COM port
+pio run -d firmware -e attaky_core_esp32 -t upload --upload-port COM5      # Attaky Core
+pio run -d firmware -e waveshare_amoled_216 -t upload --upload-port COM5   # Waveshare 2.16
 ```
 
 Run `pio run -d firmware` with no env to see the available board envs.
 
 ### Pair the device
 
-The device is a bonded BLE HID keyboard, so pair it once: **Settings → Bluetooth & devices → Add device → Bluetooth**, then select "Clawdmeter". Pairing is **required** — it enables the physical buttons and keeps a persistent connection (the device keeps showing your last-synced usage even after the daemon quits). To undo, use **Remove device** (this disables the buttons).
+The device is a bonded BLE HID keyboard, so pair it once: **Settings → Bluetooth & devices → Add device → Bluetooth**, then select the advertised device name. Attaky Core advertises as **"Attaky Claude Monitor"**; upstream Waveshare builds advertise as **"Clawdmeter"**. The daemon defaults to **"Attaky Claude Monitor"**; set `CLAWDMETER_DEVICE_NAME=Clawdmeter` before starting it if you are using an upstream Waveshare build. Pairing is **required** — it enables the physical buttons and keeps a persistent connection (the device keeps showing your last-synced usage even after the daemon quits). To undo, use **Remove device** (this disables the buttons).
 
 ### Install the daemon (recommended)
 
@@ -196,7 +200,17 @@ reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v Clawdmeter /f
 
 ## Physical buttons
 
-The board has three side buttons. Left and right send HID keys; the middle (PWR) button cycles splash animations and, held for 3 seconds, triggers pairing mode.
+Attaky Core exposes its physical keys through the AW9523 I/O expander and a direct BOOT button:
+
+| Key            | Function                                    |
+| -------------- | ------------------------------------------- |
+| **D-pad ↑↓←→** | Arrow keys                                  |
+| **SELECT**     | Enter / confirm                             |
+| **L1**         | Shift+Tab (Claude Code mode toggle)         |
+| **R2**         | Space (Claude Code voice-mode push-to-talk) |
+| **BOOT**       | Short: toggle splash/usage (cycle splash on splash) · hold 3 s + release: pairing mode |
+
+The upstream Waveshare boards have three side buttons. Left and right send HID keys; the middle (PWR) button cycles splash animations and, held for 3 seconds, triggers pairing mode.
 
 | Button           | GPIO         | Function                                                       |
 | ---------------- | ------------ | -------------------------------------------------------------- |

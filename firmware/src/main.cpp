@@ -250,6 +250,10 @@ static ble_state_t last_ble_state = BLE_STATE_INIT;
 //   6.0s (+4500)          → DISARMED (no clear; AXP powers off at 8s)
 #define PAIR_ARM_AFTER_LONG_MS    1500   // 3.0s total
 #define PAIR_DISARM_AFTER_LONG_MS 4500   // 6.0s total
+
+// UI_NAV releases shorter than this are a nav tap; anything longer is the
+// hold-to-pair gesture (matches the boards' PWR_LONG_MS threshold).
+#define UI_NAV_SHORT_MS           1500
 enum pair_state_t { PAIR_IDLE, PAIR_PENDING, PAIR_ARMED };
 static pair_state_t pair_state        = PAIR_IDLE;
 static uint32_t     pair_long_seen_ms = 0;
@@ -337,6 +341,60 @@ void loop() {
                 }
                 secondary_was = secondary_now;
             }
+        }
+
+        // Attaky Core exposes a richer HID surface through its D-pad and
+        // shoulder/select keys. Reference upstream boards return false for
+        // these extended buttons, so polling them here is behavior-neutral.
+        {
+            struct HidMap { InputButton btn; uint8_t key; uint8_t mod; };
+            static const HidMap hid[] = {
+                { INPUT_BTN_UP,     0x52, 0x00 },  // Up Arrow
+                { INPUT_BTN_DOWN,   0x51, 0x00 },  // Down Arrow
+                { INPUT_BTN_LEFT,   0x50, 0x00 },  // Left Arrow
+                { INPUT_BTN_RIGHT,  0x4F, 0x00 },  // Right Arrow
+                { INPUT_BTN_SELECT, 0x28, 0x00 },  // Enter / Return
+                { INPUT_BTN_L1,     0x2B, 0x02 },  // Tab + LEFT_SHIFT
+                { INPUT_BTN_R2,     0x2C, 0x00 },  // Space
+            };
+            static int  held_idx = -1;
+            static bool sent_key = false;
+
+            if (held_idx >= 0 && !input_hal_is_held(hid[held_idx].btn)) {
+                if (sent_key) ble_keyboard_release();
+                held_idx = -1;
+                sent_key = false;
+            }
+            if (held_idx < 0) {
+                for (int i = 0; i < (int)(sizeof(hid) / sizeof(hid[0])); i++) {
+                    if (!input_hal_is_held(hid[i].btn)) continue;
+                    held_idx = i;
+                    if (!idle_consume_wake_press()) {
+                        ble_keyboard_press(hid[i].key, hid[i].mod);
+                        sent_key = true;
+                    }
+                    break;
+                }
+            }
+        }
+
+        {
+            // Fires on SHORT release only: on boards where UI_NAV doubles
+            // as the hold-to-pair button (Attaky Core BOOT), a long hold
+            // belongs to pair_tick() and must not also toggle the screen.
+            static bool ui_nav_was = false;
+            static uint32_t ui_nav_press_ms = 0;
+            bool ui_nav_now = input_hal_is_held(INPUT_BTN_UI_NAV);
+            if (ui_nav_now && !ui_nav_was) {
+                ui_nav_press_ms = millis();
+            } else if (!ui_nav_now && ui_nav_was) {
+                if (millis() - ui_nav_press_ms < UI_NAV_SHORT_MS &&
+                    !idle_consume_wake_press()) {
+                    if (ui_get_current_screen() == SCREEN_SPLASH) splash_next();
+                    else                                          ui_toggle_splash();
+                }
+            }
+            ui_nav_was = ui_nav_now;
         }
 
         if (power_hal_pwr_pressed()) {

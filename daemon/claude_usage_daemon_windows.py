@@ -26,7 +26,7 @@ from bleak import BleakClient
 from bleak.backends.device import BLEDevice
 from bleak.exc import BleakError
 
-DEVICE_NAME = "Clawdmeter"
+DEVICE_NAME = os.environ.get("CLAWDMETER_DEVICE_NAME", "Attaky Claude Monitor")
 SERVICE_UUID = "4c41555a-4465-7669-6365-000000000001"
 RX_CHAR_UUID = "4c41555a-4465-7669-6365-000000000002"
 REQ_CHAR_UUID = "4c41555a-4465-7669-6365-000000000004"
@@ -296,7 +296,7 @@ def _mac_from_pnp_instance_id(instance_id: str) -> str | None:
 
 
 def discover_bonded_address() -> str | None:
-    """Return the BLE address of the bonded Clawdmeter, or None.
+    """Return the BLE address of the bonded target device, or None.
 
     A device that is paired AND connected to Windows stops advertising, so
     BleakScanner can't see it (the steady state once paired — see
@@ -335,7 +335,7 @@ def discover_bonded_address() -> str | None:
 
 
 async def acquire_target():
-    """Return a connectable handle for the Clawdmeter, or None.
+    """Return a connectable handle for the target device, or None.
 
     Targets only the device bonded to THIS machine (via the PnP table /
     CLAWDMETER_BLE_ADDRESS) — it never scans for a nearby device by name, so it

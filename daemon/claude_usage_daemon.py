@@ -2,7 +2,7 @@
 """Claude Usage Tracker Daemon (BLE) — macOS port of claude-usage-daemon.sh.
 
 Polls Claude API rate-limit headers and writes a JSON payload to the
-ESP32 "Clawdmeter" peripheral over a custom GATT service. Uses
+ESP32 "Attaky Claude Monitor" peripheral over a custom GATT service. Uses
 bleak (CoreBluetooth backend on macOS).
 """
 
@@ -24,7 +24,7 @@ import httpx
 from bleak import BleakClient
 from bleak.exc import BleakError
 
-DEVICE_NAME = "Clawdmeter"
+DEVICE_NAME = os.environ.get("CLAWDMETER_DEVICE_NAME", "Attaky Claude Monitor")
 SERVICE_UUID = "4c41555a-4465-7669-6365-000000000001"
 RX_CHAR_UUID = "4c41555a-4465-7669-6365-000000000002"
 REQ_CHAR_UUID = "4c41555a-4465-7669-6365-000000000004"
@@ -207,13 +207,14 @@ async def _get_cb_manager():
 
 
 async def retrieve_connected_macos(skip_addr: str | None = None):
-    """Return a BLEDevice for a system-connected 'Clawdmeter', or None.
+    """Return a BLEDevice for a system-connected DEVICE_NAME, or None.
 
     Two-step lookup, strongest signal first:
 
-    1. Peripherals connected under our CUSTOM service UUID. Membership in
-       that service is unambiguous (no other device exposes it), so we accept
-       by service alone — the peripheral's name can be None on macOS.
+    1. Peripherals connected under our CUSTOM service UUID. Membership
+       rules out unrelated devices, but Attaky and upstream builds share
+       the UUID — so a peripheral with a known, different name is skipped.
+       A None name (possible on macOS) is still accepted.
     2. Fall back to the generic HID service 0x1812, but ONLY trust a
        peripheral whose name matches DEVICE_NAME. 0x1812 also matches
        unrelated keyboards/mice, so picking blindly here could grab the
@@ -241,12 +242,15 @@ async def retrieve_connected_macos(skip_addr: str | None = None):
     def _ok(p) -> bool:
         return not (skip_addr and p.identifier().UUIDString() == skip_addr)
 
-    # 1. Custom service — accept by service membership alone.
+    # 1. Custom service. Membership is unambiguous vs unrelated devices,
+    # but Attaky and upstream builds share SERVICE_UUID — a peripheral
+    # whose name is known and DIFFERENT is the other family, so skip it.
+    # A None name (macOS can return nil pre-discovery) is still accepted.
     custom = cm.retrieveConnectedPeripheralsWithServices_(
         [CBUUID.UUIDWithString_(SERVICE_UUID)]
     )
     for p in custom or []:
-        if _ok(p):
+        if _ok(p) and (p.name() is None or p.name() == DEVICE_NAME):
             return _wrap(p)
 
     # 2. Generic HID service — require an exact name match.
@@ -628,7 +632,7 @@ def unpair_macos() -> bool:
         return False
 
     # Each line looks like:
-    #   address: 28-84-85-55-5c-3d, ... name: "Clawdmeter", ...
+    #   address: 28-84-85-55-5c-3d, ... name: "Attaky Claude Monitor", ...
     addr = None
     for line in out.splitlines():
         if f'name: "{DEVICE_NAME}"' in line:

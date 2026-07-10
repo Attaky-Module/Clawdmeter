@@ -13,7 +13,7 @@ the manual-run fallback, and how to manage or remove autostart.
 | **Native Windows** | Must run on real Windows — not WSL. The script prints a warning and BLE will not work under WSL. |
 | **Python 3.11+** | Download from [python.org](https://www.python.org/downloads/) if not already installed. Ensure "Add python.exe to PATH" is checked during install. |
 | **Claude Code installed** | Install Claude Code and complete `claude login` so credentials exist on disk. |
-| **Clawdmeter powered on** | The device must be powered on and in range before the daemon starts. |
+| **Device powered on** | The device must be powered on and in range before the daemon starts. |
 | **Paired with Windows Bluetooth** | Pair the device once via **Settings → Bluetooth & devices → Add device** (see [Pair the device](#pair-the-device-one-time)). This is required — the device is a bonded BLE HID keyboard, so pairing enables its physical buttons and keeps a persistent connection that shows your last usage even when the daemon is stopped. |
 
 ### Where are my credentials?
@@ -35,14 +35,18 @@ absolute path or `CLAUDE_CONFIG_DIR` to a directory to override the search entir
 
 ## Pair the device (one time)
 
-The Clawdmeter is a **bonded BLE HID keyboard** as well as a usage display — its firmware
+The device is a **bonded BLE HID keyboard** as well as a usage display — its firmware
 enables bonding (`NimBLEDevice::setSecurityAuth`) and advertises the HID service so its
 physical buttons act as a keyboard (Space / Shift+Tab). Pair it with Windows **once**,
 before running the daemon:
 
 1. Put the device on its Bluetooth waiting screen (powered on, not yet connected).
 2. Open **Settings → Bluetooth & devices → Add device → Bluetooth**.
-3. Select **Clawdmeter** and complete pairing.
+3. Select **Attaky Claude Monitor** and complete pairing.
+
+The Windows daemon defaults to **Attaky Claude Monitor**. To target an upstream
+firmware build that still advertises as **Clawdmeter**, set
+`CLAWDMETER_DEVICE_NAME=Clawdmeter` before starting the daemon.
 
 **Why this is required:**
 
@@ -93,7 +97,7 @@ This installs `bleak` (WinRT BLE) and `httpx` (async HTTP for the Anthropic API)
 
 ## Running the daemon
 
-With the venv active and the Clawdmeter powered on:
+With the venv active and the device powered on:
 
 ```powershell
 python daemon\claude_usage_daemon_windows.py
@@ -104,7 +108,7 @@ python daemon\claude_usage_daemon_windows.py
 ```
 [HH:MM:SS] === Claude Usage Tracker Daemon (BLE, Windows) ===
 [HH:MM:SS] Poll interval: 60s
-[HH:MM:SS] Scanning for 'Clawdmeter' (8.0s)...
+[HH:MM:SS] Scanning for 'Attaky Claude Monitor' (8.0s)...
 [HH:MM:SS] Not advertising; connecting to bonded address XX:XX:XX:XX:XX:XX
 [HH:MM:SS] Connecting to XX:XX:XX:XX:XX:XX...
 [HH:MM:SS] Connected
@@ -140,7 +144,7 @@ Press **Ctrl+C** in the terminal. The daemon logs `Daemon stopping` and exits cl
 | Symptom | Likely cause | Fix |
 |---------|-------------|-----|
 | `Warning: running under Linux/WSL` | Running in WSL, not native Windows | Run from a native PowerShell or Command Prompt on Windows |
-| `Scanning for 'Clawdmeter'… Device not found` | Clawdmeter is off, out of range, or not yet paired | Power on the device, pair it once (see [Pair the device](#pair-the-device-one-time)), and ensure it is in range |
+| `Scanning for 'Attaky Claude Monitor'... Device not found` | The device is off, out of range, or not yet paired | Power on the device, pair it once (see [Pair the device](#pair-the-device-one-time)), and ensure it is in range |
 | `No token; skipping poll` | No credentials file found at any candidate path | Confirm `claude login` ran on this machine; check `%USERPROFILE%\.claude\.credentials.json` exists |
 | `API HTTP 401` | Token expired | Re-run `claude login` in a terminal to refresh the token, then restart the daemon |
 | `Connection failed` | WinRT BLE initialisation issue | Ensure Windows Bluetooth is on; try toggling Bluetooth off/on in Windows Settings |

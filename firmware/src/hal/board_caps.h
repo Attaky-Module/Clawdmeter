@@ -10,6 +10,11 @@
 // goes here so shared code stays free of #ifdef BOARD_*.
 struct BoardCaps {
     const char* name;        // human-readable, e.g. "Waveshare AMOLED 2.16"
+    const char* ble_name;    // advertised BLE name, e.g. "Clawdmeter"
+    // Button named by the on-screen pairing hint. NULL = "the power button"
+    // (upstream boards). Boards whose power button is a hardware-level power
+    // toggle route hold-to-pair to another button and set this label.
+    const char* pair_button_label;
 
     int16_t width;           // active display width in pixels
     int16_t height;          // active display height in pixels

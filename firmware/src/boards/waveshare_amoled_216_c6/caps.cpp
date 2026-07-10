@@ -3,6 +3,7 @@
 
 static const BoardCaps caps = {
     .name = BOARD_NAME,
+    .ble_name = "Clawdmeter",
     .width = LCD_WIDTH,
     .height = LCD_HEIGHT,
     // BOOT (primary) + KEY (secondary) GPIO buttons. PWR is on the AXP

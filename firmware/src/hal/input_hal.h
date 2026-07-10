@@ -16,6 +16,15 @@
 enum InputButton {
     INPUT_BTN_PRIMARY = 0,
     INPUT_BTN_SECONDARY = 1,
+    INPUT_BTN_UP,
+    INPUT_BTN_DOWN,
+    INPUT_BTN_LEFT,
+    INPUT_BTN_RIGHT,
+    INPUT_BTN_SELECT,
+    INPUT_BTN_L1,
+    INPUT_BTN_R2,
+    INPUT_BTN_UI_NAV,
+    INPUT_BTN_COUNT,
 };
 
 void input_hal_init(void);
