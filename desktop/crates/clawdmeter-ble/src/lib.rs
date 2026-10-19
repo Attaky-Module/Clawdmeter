@@ -56,7 +56,7 @@ use futures::{Stream, StreamExt};
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
-pub use clawdmeter_core::DEVICE_NAME;
+pub use clawdmeter_core::{DEVICE_NAME, DEVICE_NAMES};
 
 /// Custom data service.
 pub const SERVICE_UUID: Uuid = Uuid::from_u128(0x4c41555a_4465_7669_6365_000000000001);
@@ -231,9 +231,17 @@ pub(crate) async fn describe(p: Peripheral) -> Candidate {
 }
 
 /// True when a candidate is ours: the custom service alone is enough; the
-/// HID service (shared with every keyboard) needs the exact name.
+/// HID service (shared with every keyboard) needs one of the exact names.
 pub fn accept(name: Option<&str>, has_service: bool) -> bool {
-    has_service || name == Some(DEVICE_NAME)
+    has_service || name.is_some_and(|n| DEVICE_NAMES.contains(&n))
+}
+
+/// Whether a failed candidate's stale macOS bond may be cleared
+/// automatically. The cleanup unpairs by name, so it runs only for a
+/// candidate known to carry [`DEVICE_NAME`]: for any other or unknown name it
+/// could unpair a different, healthy device.
+pub fn auto_unpair_allowed(name: Option<&str>) -> bool {
+    name == Some(DEVICE_NAME)
 }
 
 /// Pick among accepted candidates: the cached key first, else the first.
@@ -453,8 +461,16 @@ impl DeviceLink {
                 Err(e) => {
                     log::warn!("connect to {} failed: {e}", cand.key);
                     if cfg!(target_os = "macos") && is_encryption_error(&e.to_string()) {
-                        log::warn!("encryption failed: likely a stale macOS bond; trying to unpair it");
-                        let _ = tokio::task::spawn_blocking(macos_unpair_stale_bond).await;
+                        if auto_unpair_allowed(cand.name.as_deref()) {
+                            log::warn!("encryption failed: likely a stale macOS bond; trying to unpair it");
+                            let _ = tokio::task::spawn_blocking(macos_unpair_stale_bond).await;
+                        } else {
+                            log::warn!(
+                                "encryption failed: likely a stale macOS bond. Forget '{}' in System Settings > \
+                                 Bluetooth (or clear the pairing on the device) and connect again",
+                                cand.name.as_deref().unwrap_or("the device")
+                            );
+                        }
                     }
                     cache.invalidate(&cand.key);
                     last_err = e;
@@ -606,15 +622,24 @@ async fn bonded_by_address(adapter: &Adapter, cached: Option<&str>) -> Vec<Candi
     out
 }
 
+/// The PowerShell lookup [`windows_pnp_address`] runs: bonded Bluetooth
+/// devices with any of [`DEVICE_NAMES`].
+#[cfg_attr(not(windows), allow(dead_code))]
+fn pnp_lookup_script() -> String {
+    let names: Vec<String> = DEVICE_NAMES.iter().map(|n| format!("'{n}'")).collect();
+    format!(
+        "Get-PnpDevice -Class Bluetooth -ErrorAction SilentlyContinue | \
+         Where-Object {{ $_.FriendlyName -in {} }} | Select-Object -ExpandProperty InstanceId",
+        names.join(",")
+    )
+}
+
 /// The bonded Clawdmeter's MAC from the Windows PnP table (the Windows
 /// daemon's `Get-PnpDevice` lookup). `None` on any failure.
 #[cfg(windows)]
 fn windows_pnp_address() -> Option<String> {
     use std::os::windows::process::CommandExt;
-    let script = format!(
-        "Get-PnpDevice -Class Bluetooth -ErrorAction SilentlyContinue | \
-         Where-Object {{ $_.FriendlyName -eq '{DEVICE_NAME}' }} | Select-Object -ExpandProperty InstanceId"
-    );
+    let script = pnp_lookup_script();
     let out = std::process::Command::new("powershell")
         .args(["-NoProfile", "-NonInteractive", "-Command", &script])
         .stdin(std::process::Stdio::null())
@@ -857,8 +882,22 @@ mod tests {
     fn acceptance_rules() {
         assert!(accept(None, true));
         assert!(accept(Some("Clawdmeter"), false));
+        assert!(accept(Some("Attaky Claude Monitor"), false));
         assert!(!accept(Some("Keychron K2"), false));
         assert!(!accept(Some("clawdmeter"), false));
         assert!(!accept(None, false));
+    }
+
+    #[test]
+    fn stale_bond_cleanup_only_for_the_named_device() {
+        assert!(auto_unpair_allowed(Some("Clawdmeter")));
+        assert!(!auto_unpair_allowed(Some("Attaky Claude Monitor")));
+        assert!(!auto_unpair_allowed(None));
+    }
+
+    #[test]
+    fn pnp_lookup_matches_every_device_name() {
+        let script = pnp_lookup_script();
+        assert!(script.contains("$_.FriendlyName -in 'Clawdmeter','Attaky Claude Monitor'"), "{script}");
     }
 }

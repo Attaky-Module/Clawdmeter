@@ -267,12 +267,14 @@ impl SetupView {
 
     fn pair(&self, t: &Theme, cx: &Context<Self>) -> gpui::Div {
         let how = if cfg!(target_os = "macos") {
-            "Open System Settings → Bluetooth and click Connect next to Clawdmeter."
+            "Open System Settings → Bluetooth and click Connect next to Clawdmeter (on Attaky Core: Attaky \
+             Claude Monitor)."
         } else if cfg!(windows) {
-            "Open Settings → Bluetooth & devices → Add device → Bluetooth, and choose Clawdmeter."
+            "Open Settings → Bluetooth & devices → Add device → Bluetooth, and choose Clawdmeter (on Attaky \
+             Core: Attaky Claude Monitor)."
         } else {
-            "Open your desktop's Bluetooth settings and pair Clawdmeter. From a terminal: bluetoothctl, then \
-             scan on, pair <address> and trust <address>."
+            "Open your desktop's Bluetooth settings and pair Clawdmeter (on Attaky Core: Attaky Claude Monitor). \
+             From a terminal: bluetoothctl, then scan on, pair <address> and trust <address>."
         };
         let status = match (self.running, self.connected) {
             (_, true) => pill(t, "Connected", Tone::Ok).into_any_element(),

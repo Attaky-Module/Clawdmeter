@@ -46,6 +46,10 @@ pub use usage::{UsageError, UsageReading, Window};
 /// The device's advertised name.
 pub const DEVICE_NAME: &str = "Clawdmeter";
 
+/// Every name a device may advertise: [`DEVICE_NAME`], and the Attaky Core
+/// build's own name.
+pub const DEVICE_NAMES: [&str; 2] = [DEVICE_NAME, "Attaky Claude Monitor"];
+
 /// Unix seconds now.
 pub fn unix_now() -> i64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0)

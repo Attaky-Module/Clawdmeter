@@ -4,12 +4,18 @@ on:
   pull_request:
     paths:
       - "desktop/**"
+      # The app embeds the fonts and checks its board list against the envs.
+      - "assets/**"
+      - "firmware/platformio.ini"
       - ".github/workflows/desktop.yml"
       - ".github/actions/linux-desktop-deps/**"
   push:
     branches: [main]
     paths:
       - "desktop/**"
+      # The app embeds the fonts and checks its board list against the envs.
+      - "assets/**"
+      - "firmware/platformio.ini"
       - ".github/workflows/desktop.yml"
       - ".github/actions/linux-desktop-deps/**"
   workflow_dispatch:
