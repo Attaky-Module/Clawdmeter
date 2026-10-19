@@ -35,6 +35,15 @@ struct BoardCaps {
                              // button when button_count is 0) dismisses an
                              // active alert before it does anything else
                              // (director_button).
+
+    // Optional; zero (omitted from a board's initializer) keeps upstream
+    // behavior.
+    const char* ble_name;    // advertised BLE name; NULL = "Clawdmeter"
+    bool    pair_on_boot;    // hold-to-pair is sourced from BOOT, not PWR
+                             // (PWR long-hold is a hardware power toggle):
+                             // the pairing hint names BOOT. The board's
+                             // power_hal still reports the BOOT long/release
+                             // edges as pwr_long_pressed / pwr_released.
 };
 
 const BoardCaps& board_caps(void);

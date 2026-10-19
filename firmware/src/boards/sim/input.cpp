@@ -10,6 +10,7 @@ bool input_hal_is_held(InputButton btn) {
     switch (btn) {
     case INPUT_BTN_PRIMARY:   return keys[SDL_SCANCODE_B] != 0;
     case INPUT_BTN_SECONDARY: return keys[SDL_SCANCODE_N] != 0;
+    default:                  break;   // no extended keys in the sim
     }
     return false;
 }

@@ -3,8 +3,10 @@
 #include <NimBLEDevice.h>
 #include <NimBLEHIDDevice.h>
 #include <Preferences.h>
+#include <string.h>
+#include "hal/board_caps.h"
 
-#define DEVICE_NAME "Clawdmeter"
+#define DEFAULT_DEVICE_NAME "Clawdmeter"
 
 // Custom GATT UUIDs for data channel
 #define SERVICE_UUID        "4c41555a-4465-7669-6365-000000000001"
@@ -159,10 +161,12 @@ static void start_advertising() {
     //   = 23 bytes. macOS Bluetooth Settings only surfaces BLE-only devices
     //   that explicitly advertise the standard HID service UUID (0x1812) —
     //   without it the device is recognized internally but hidden from the
-    //   GUI nearby-devices list.
-    adv->setAppearance(HID_KEYBOARD);
+    //   GUI nearby-devices list. A board name longer than 18 characters
+    //   ("Attaky Claude Monitor") drops the optional appearance to fit.
+    const char* name = ble_get_device_name();
+    if (3 + 4 + 4 + 2 + strlen(name) <= 31) adv->setAppearance(HID_KEYBOARD);
     adv->addServiceUUID(NimBLEUUID((uint16_t)0x1812));  // BLE HID Service
-    adv->setName(DEVICE_NAME);
+    adv->setName(name);
     // Scan response carries the 128-bit custom data-service UUID for active
     // scanners (the host app scans actively).
     NimBLEAdvertisementData scanResp;
@@ -316,7 +320,7 @@ class ReqCallbacks : public NimBLECharacteristicCallbacks {
 };
 
 void ble_init(void) {
-    NimBLEDevice::init(DEVICE_NAME);
+    NimBLEDevice::init(ble_get_device_name());
     NimBLEDevice::setSecurityAuth(true, false, true);  // bonding, no MITM, SC
 
     // Restore the locked owner (if any) and drop any stale non-owner bonds so
@@ -405,7 +409,8 @@ ble_state_t ble_get_state(void) {
 }
 
 const char* ble_get_device_name(void) {
-    return DEVICE_NAME;
+    const char* name = board_caps().ble_name;
+    return name ? name : DEFAULT_DEVICE_NAME;
 }
 
 const char* ble_get_mac_address(void) {

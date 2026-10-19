@@ -307,6 +307,9 @@ static int shown_group = 0;   // mood group last logged
 //   6.0s (+4500)          → DISARMED (no clear; AXP powers off at 8s)
 #define PAIR_ARM_AFTER_LONG_MS    1500   // 3.0s total
 #define PAIR_DISARM_AFTER_LONG_MS 4500   // 6.0s total
+// UI_NAV releases shorter than this are a tap; anything longer is the
+// hold-to-pair gesture (the boards' long-press threshold).
+#define UI_NAV_SHORT_MS           1500
 enum pair_state_t { PAIR_IDLE, PAIR_PENDING, PAIR_ARMED };
 static pair_state_t pair_state        = PAIR_IDLE;
 static uint32_t     pair_long_seen_ms = 0;
@@ -367,6 +370,24 @@ static void touch_pair_tick(void) {
     }
 }
 
+// The HID report holds one key and ble_keyboard_release() clears it, so
+// with several keys only the last one pressed owns the report and only its
+// own release clears it (a release of a key that lost the report is a no-op).
+static uint8_t hid_owner_key = 0, hid_owner_mod = 0;
+
+static void hid_press(uint8_t key, uint8_t mod) {
+    hid_owner_key = key;
+    hid_owner_mod = mod;
+    ble_keyboard_press(key, mod);
+}
+
+static void hid_release(uint8_t key, uint8_t mod) {
+    if (hid_owner_key != key || hid_owner_mod != mod) return;
+    hid_owner_key = 0;
+    hid_owner_mod = 0;
+    ble_keyboard_release();
+}
+
 void loop() {
     idle_tick();
     lv_timer_handler();
@@ -403,10 +424,10 @@ void loop() {
                 // No touchscreen: BOOT dismisses an active alert first and is
                 // not a push-to-talk press then.
                 else if (director_button(true)) primary_wake_swallowed = true;
-                else { ble_keyboard_press(0x2C, 0); }                     // HID Space, no mods
+                else { hid_press(0x2C, 0); }                              // HID Space, no mods
             } else {
                 if (primary_wake_swallowed) primary_wake_swallowed = false;
-                else                        ble_keyboard_release();
+                else                        hid_release(0x2C, 0);
             }
             primary_was = primary_now;
         }
@@ -418,13 +439,57 @@ void loop() {
             if (secondary_now != secondary_was) {
                 if (secondary_now) {
                     if (idle_consume_wake_press()) secondary_wake_swallowed = true;
-                    else { ble_keyboard_press(0x2B, 0x02); director_button(false); }  // HID Tab + LEFT_SHIFT
+                    else { hid_press(0x2B, 0x02); director_button(false); }  // HID Tab + LEFT_SHIFT
                 } else {
                     if (secondary_wake_swallowed) secondary_wake_swallowed = false;
-                    else                          ble_keyboard_release();
+                    else                          hid_release(0x2B, 0x02);
                 }
                 secondary_was = secondary_now;
             }
+        }
+
+        // Extended keys (Attaky Core D-pad + SELECT); other boards report
+        // them never held. Arrows / Enter navigate Claude Code's menus.
+        {
+            struct HidMap { InputButton btn; uint8_t key; };
+            static const HidMap hid[] = {
+                { INPUT_BTN_UP,     0x52 },  // Up Arrow
+                { INPUT_BTN_DOWN,   0x51 },  // Down Arrow
+                { INPUT_BTN_LEFT,   0x50 },  // Left Arrow
+                { INPUT_BTN_RIGHT,  0x4F },  // Right Arrow
+                { INPUT_BTN_SELECT, 0x28 },  // Enter / Return
+            };
+            static bool was[sizeof(hid) / sizeof(hid[0])] = {};
+            static bool swallowed[sizeof(hid) / sizeof(hid[0])] = {};
+            for (size_t i = 0; i < sizeof(hid) / sizeof(hid[0]); i++) {
+                const bool now = input_hal_is_held(hid[i].btn);
+                if (now == was[i]) continue;
+                was[i] = now;
+                if (now) {
+                    if (idle_consume_wake_press()) swallowed[i] = true;
+                    else { hid_press(hid[i].key, 0); director_button(false); }
+                } else {
+                    if (swallowed[i]) swallowed[i] = false;
+                    else              hid_release(hid[i].key, 0);
+                }
+            }
+        }
+
+        // UI_NAV (Attaky Core BOOT): no HID; a short press counts as you
+        // being here. A longer hold is the board's hold-to-pair gesture
+        // (pair_tick) and does nothing else.
+        {
+            static bool     ui_nav_was = false;
+            static uint32_t ui_nav_down_ms = 0;
+            const bool ui_nav_now = input_hal_is_held(INPUT_BTN_UI_NAV);
+            if (ui_nav_now && !ui_nav_was) {
+                ui_nav_down_ms = millis();
+            } else if (!ui_nav_now && ui_nav_was &&
+                       millis() - ui_nav_down_ms < UI_NAV_SHORT_MS &&
+                       !idle_consume_wake_press()) {
+                director_button(false);
+            }
+            ui_nav_was = ui_nav_now;
         }
 
         if (power_hal_pwr_pressed()) {

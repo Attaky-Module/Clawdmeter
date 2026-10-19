@@ -28,7 +28,7 @@ pub struct BoardInfo {
 }
 
 /// Every hardware env in `firmware/platformio.ini` (not `sim` / `native`).
-pub const BOARDS: [BoardInfo; 25] = [
+pub const BOARDS: [BoardInfo; 26] = [
     BoardInfo {
         env: "waveshare_amoled_216",
         name: "AMOLED 2.16",
@@ -304,6 +304,19 @@ pub const BOARDS: [BoardInfo; 25] = [
         chip: "ESP32-S3",
         pwr_button: false,
     },
+    BoardInfo {
+        env: "attaky_core_esp32",
+        name: "Attaky Core",
+        product: "Attaky Core ESP32 with the Power cell",
+        width: 320,
+        height: 240,
+        buy_url: "https://shop.attaky.com",
+        summary: "320×240 · D-pad + 3 keys",
+        chip: "ESP32-S3",
+        // Its POWER long hold is a hardware power toggle; the pairing is
+        // cleared from BOOT instead (see `pair_method`).
+        pwr_button: true,
+    },
 ];
 
 /// Look up a board by env.
@@ -311,7 +324,27 @@ pub fn board(env: &str) -> Option<&'static BoardInfo> {
     BOARDS.iter().find(|b| b.env == env)
 }
 
+/// How a board clears its pairing from the device.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PairMethod {
+    /// Hold PWR for 3 s, then release.
+    Pwr,
+    /// Hold BOOT for 3 s, then release (PWR is a hardware power toggle).
+    Boot,
+    /// Hold a finger on the pairing hint for 5 s.
+    Touch,
+}
+
 impl BoardInfo {
+    /// How this board clears its pairing.
+    pub fn pair_method(&self) -> PairMethod {
+        match (self.env, self.pwr_button) {
+            ("attaky_core_esp32", _) => PairMethod::Boot,
+            (_, true) => PairMethod::Pwr,
+            (_, false) => PairMethod::Touch,
+        }
+    }
+
     /// The illustration's asset path (see [`crate::ui::Assets`]).
     pub fn illustration(&self) -> String {
         format!("boards/{}.svg", self.env)

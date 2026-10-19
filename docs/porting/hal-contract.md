@@ -40,6 +40,12 @@ AMOLED-1.8 port includes a small I2C reader as an implementation reference.
 | `input_hal_init`  | `pinMode()` for the physical button GPIOs. |
 | `input_hal_is_held` | Return true while the button is held. Active-low pull-up GPIOs are typical. Boards lacking a secondary button must return `false` for `INPUT_BTN_SECONDARY`. |
 
+The extended values (`INPUT_BTN_UP` / `DOWN` / `LEFT` / `RIGHT` / `SELECT`,
+sent as arrow keys / Enter, and `INPUT_BTN_UI_NAV`, a non-HID "I'm here"
+key) are for boards with more keys (Attaky Core); every other board returns
+`false` for them. Shared code arbitrates the single-key HID report: the last
+key pressed owns it and only its own release clears it.
+
 PWR belongs to `power_hal`, whether its input comes from a PMU, IO
 expander, or GPIO. The LCD-4 hardware reset key is not a software PWR input.
 
@@ -62,6 +68,9 @@ Also implement `power_hal_is_vbus_in()` for USB power status,
 `power_hal_pwr_long_pressed()` for a one-shot long-press event, and
 `power_hal_pwr_released()` for a one-shot release event. The pairing gesture
 uses the long-press and release edges; a held level is not a substitute.
+On a board whose PWR long hold is a hardware power toggle, report those two
+edges from another button that is safe to hold and set `pair_on_boot`
+(`capability-flags.md`); PWR then delivers short presses only.
 
 ## `sound_hal.h`
 

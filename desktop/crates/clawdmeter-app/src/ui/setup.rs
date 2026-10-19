@@ -392,17 +392,22 @@ impl SetupView {
 
 /// How to clear a pairing to another computer, for the board at hand.
 fn unpair_hint(board: Option<&crate::boards::BoardInfo>) -> &'static str {
-    match board {
-        Some(b) if b.pwr_button => {
+    use crate::boards::PairMethod;
+    match board.map(|b| b.pair_method()) {
+        Some(PairMethod::Pwr) => {
             "Paired with another computer before? Hold PWR for 3 seconds, then release to clear the old pairing."
         }
-        Some(_) => {
+        Some(PairMethod::Boot) => {
+            "Paired with another computer before? Hold BOOT for 3 seconds, then release to clear the old pairing."
+        }
+        Some(PairMethod::Touch) => {
             "Paired with another computer before? While the screen shows the pairing hint, hold a finger on it \
              for 5 seconds to clear the old pairing."
         }
         None => {
             "Paired with another computer before? Hold PWR for 3 seconds, then release to clear the old \
-             pairing. On boards without a PWR button, hold the screen for 5 seconds while it shows the pairing hint."
+             pairing (on Attaky Core, hold BOOT instead). On boards without a PWR button, hold the screen for \
+             5 seconds while it shows the pairing hint."
         }
     }
 }
@@ -552,5 +557,9 @@ mod tests {
         assert!(!unpair_hint(lcd4).contains("PWR"), "the LCD-4's PWR key is a reset");
         assert!(unpair_hint(amoled).contains("Hold PWR for 3 seconds"));
         assert!(unpair_hint(None).contains("without a PWR button"));
+        let attaky = crate::boards::board("attaky_core_esp32");
+        assert!(unpair_hint(attaky).contains("Hold BOOT for 3 seconds"));
+        assert!(!unpair_hint(attaky).contains("PWR"), "Attaky Core's POWER hold is a power toggle");
+        assert!(unpair_hint(None).contains("on Attaky Core, hold BOOT"));
     }
 }
