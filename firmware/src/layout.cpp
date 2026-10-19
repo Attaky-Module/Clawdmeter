@@ -3,15 +3,15 @@
 #include <math.h>
 #include <stdio.h>
 
-LV_FONT_DECLARE(font_tiempos_56);
-LV_FONT_DECLARE(font_tiempos_34);
-LV_FONT_DECLARE(font_styrene_48);
-LV_FONT_DECLARE(font_styrene_28);
-LV_FONT_DECLARE(font_styrene_24);
-LV_FONT_DECLARE(font_styrene_20);
-LV_FONT_DECLARE(font_styrene_16);
-LV_FONT_DECLARE(font_styrene_14);
-LV_FONT_DECLARE(font_styrene_12);
+LV_FONT_DECLARE(font_serif_56);
+LV_FONT_DECLARE(font_serif_34);
+LV_FONT_DECLARE(font_sans_48);
+LV_FONT_DECLARE(font_sans_28);
+LV_FONT_DECLARE(font_sans_24);
+LV_FONT_DECLARE(font_sans_20);
+LV_FONT_DECLARE(font_sans_16);
+LV_FONT_DECLARE(font_sans_14);
+LV_FONT_DECLARE(font_sans_12);
 LV_FONT_DECLARE(font_mono_32);
 LV_FONT_DECLARE(font_mono_18);
 
@@ -86,13 +86,13 @@ static int16_t widest_clock(const lv_font_t* f, bool h12) {
 
 // Fonts a title steps down through, largest first.
 static const lv_font_t* const TITLE_FONTS[] = {
-    &font_tiempos_56, &font_tiempos_34, &font_styrene_24, &font_styrene_16, &font_styrene_14,
+    &font_serif_56, &font_serif_34, &font_sans_24, &font_sans_16, &font_sans_14,
 };
 #define TITLE_FONT_COUNT (int)(sizeof(TITLE_FONTS) / sizeof(TITLE_FONTS[0]))
 
 // Text sizes the pairing hint and the period line step down through.
 static const lv_font_t* const TEXT_FONTS[] = {
-    &font_styrene_48, &font_styrene_28, &font_styrene_20, &font_styrene_14, &font_styrene_12,
+    &font_sans_48, &font_sans_28, &font_sans_20, &font_sans_14, &font_sans_12,
 };
 #define TEXT_FONT_COUNT (int)(sizeof(TEXT_FONTS) / sizeof(TEXT_FONTS[0]))
 
@@ -136,8 +136,8 @@ static const Design LARGE = {
     .chrome = &CHROME_LARGE, .top = 100, .margin = 20, .card_h = 150, .gap = 16,
     .bar_y = 56, .bar_h = 24, .reset_y = 94,
     .pad_x = 16, .pad_y = 12, .pill_pad_x = 18, .pill_pad_y = 6,
-    .pct = &font_styrene_48, .ent_pct = &font_tiempos_56, .pill = &font_styrene_28,
-    .reset = &font_styrene_28, .pace = &font_styrene_16,
+    .pct = &font_sans_48, .ent_pct = &font_serif_56, .pill = &font_sans_28,
+    .reset = &font_sans_28, .pace = &font_sans_16,
     .pair_y = { 40, 120, 160, 230 },
 };
 // 368x448 (AMOLED-1.8): the large type on shorter cards. They start just
@@ -147,8 +147,8 @@ static const Design COMPACT = {
     .chrome = &CHROME_LARGE, .top = 96, .margin = 20, .card_h = 130, .gap = 12,
     .bar_y = 48, .bar_h = 24, .reset_y = 78,
     .pad_x = 16, .pad_y = 12, .pill_pad_x = 18, .pill_pad_y = 6,
-    .pct = &font_styrene_48, .ent_pct = &font_tiempos_56, .pill = &font_styrene_28,
-    .reset = &font_styrene_28, .pace = &font_styrene_16,
+    .pct = &font_sans_48, .ent_pct = &font_serif_56, .pill = &font_sans_28,
+    .reset = &font_sans_28, .pace = &font_sans_16,
     .pair_y = { 40, 120, 160, 230 },
 };
 // 240x240 (LCD-1.54): type two steps down, cards about half as tall.
@@ -156,8 +156,8 @@ static const Design SMALL = {
     .chrome = &CHROME_SMALL, .top = 44, .margin = 8, .card_h = 74, .gap = 6,
     .bar_y = 30, .bar_h = 12, .reset_y = 46,
     .pad_x = 10, .pad_y = 6, .pill_pad_x = 8, .pill_pad_y = 2,
-    .pct = &font_styrene_24, .ent_pct = &font_tiempos_34, .pill = &font_styrene_14,
-    .reset = &font_styrene_14, .pace = &font_styrene_12,
+    .pct = &font_sans_24, .ent_pct = &font_serif_34, .pill = &font_sans_14,
+    .reset = &font_sans_14, .pace = &font_sans_12,
     .pair_y = { 12, 56, 80, 112 },
 };
 
@@ -344,11 +344,11 @@ static void fit_narrow(Layout& L) {
     L.pad_x = 6;
     L.pill_pad_x = 6;
     if (cards_fit(L)) return;
-    L.pill_font = &font_styrene_12;
-    L.reset_font = &font_styrene_12;
+    L.pill_font = &font_sans_12;
+    L.reset_font = &font_sans_12;
     if (cards_fit(L)) return;
-    L.pct_font = &font_styrene_20;
-    L.ent_pct_font = &font_styrene_20;
+    L.pct_font = &font_sans_20;
+    L.ent_pct_font = &font_sans_20;
 }
 
 static int16_t card_gap(const Layout& L) { return L.card[1].y - (L.card[0].y + L.card[0].h); }

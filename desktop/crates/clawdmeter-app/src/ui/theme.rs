@@ -5,10 +5,10 @@
 
 use gpui::{rgb, Rgba, WindowAppearance};
 
-/// Display face (Tiempos Text).
-pub const FONT_DISPLAY: &str = "Tiempos Text";
-/// Body face (Styrene B).
-pub const FONT_BODY: &str = "Styrene B";
+/// Display face (Source Serif 4).
+pub const FONT_DISPLAY: &str = "Source Serif 4";
+/// Body face (Archivo).
+pub const FONT_BODY: &str = "Archivo";
 /// Data face (DejaVu Sans Mono).
 pub const FONT_MONO: &str = "DejaVu Sans Mono";
 

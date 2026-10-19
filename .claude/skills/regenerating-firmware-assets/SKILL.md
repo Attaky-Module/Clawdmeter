@@ -22,8 +22,8 @@ invisible**:
 3. Set `.release_glyph = NULL`, `.kerning = 0`, `.static_bitmap = 0`.
 4. Set `.fallback = NULL`, `.user_data = NULL`.
 
-Diff against a checked-in font to confirm the shape. Styrene and Tiempos are
-ASCII only; new symbols need a font that has the glyphs. Then check rendering
+Diff against a checked-in font to confirm the shape. The Archivo and Source
+Serif 4 sizes are ASCII only; new symbols need a font that has the glyphs. Then check rendering
 in the simulator at 480×480 and 240×240 (`verifying-firmware-ui` skill): a
 clean compile proves nothing.
 

@@ -1,23 +1,24 @@
 # Generate firmware fonts
 
 `firmware/src/font_*.c` contains the LVGL bitmap fonts. Run the converter
-from the repository root. The commands below use the bundled font files;
-their presence does not grant redistribution rights (see the README's
-asset notice).
+from the repository root. The display serif is Source Serif 4 and the body
+sans is Archivo, both under the SIL Open Font License 1.1
+(`assets/OFL-SourceSerif4.txt`, `assets/OFL-Archivo.txt`); the mono face is
+DejaVu Sans Mono.
 
 ```bash
 npm install -g lv_font_conv@1.5.3
 
 for size in 56 34; do
-  lv_font_conv --font assets/TiemposText-400-Regular.otf -r 0x20-0x7E \
+  lv_font_conv --font assets/SourceSerif4-Regular.ttf -r 0x20-0x7E \
     --size "$size" --format lvgl --bpp 4 --no-compress \
-    -o "firmware/src/font_tiempos_${size}.c" --lv-include "lvgl.h"
+    -o "firmware/src/font_serif_${size}.c" --lv-include "lvgl.h"
 done
 
 for size in 48 28 24 20 16 14 12; do
-  lv_font_conv --font assets/StyreneB-Regular.otf -r 0x20-0x7E \
+  lv_font_conv --font assets/Archivo-Regular.ttf -r 0x20-0x7E \
     --size "$size" --format lvgl --bpp 4 --no-compress \
-    -o "firmware/src/font_styrene_${size}.c" --lv-include "lvgl.h"
+    -o "firmware/src/font_sans_${size}.c" --lv-include "lvgl.h"
 done
 
 for size in 32 18; do
@@ -38,5 +39,5 @@ match the generated files to the LVGL 9 structures used in this repository:
 
 Compare against a checked-in font before replacing it. Build and render the
 simulator afterward: a successful compile alone does not prove the glyphs
-render. Check the 240×240 layout as well as 480×480. Styrene and Tiempos
-contain ASCII only; new symbols need a font with the corresponding glyphs.
+render. Check the 240×240 layout as well as 480×480. The serif and sans sizes
+are generated for ASCII only; new symbols need a font with the corresponding glyphs.

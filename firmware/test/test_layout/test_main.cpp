@@ -198,16 +198,16 @@ static void test_large_480x480(void) {
     TEST_ASSERT_EQUAL_INT16(266, L.card[1].y);
     TEST_ASSERT_EQUAL_INT16(56, L.bar_y);       TEST_ASSERT_EQUAL_INT16(24, L.bar_h);
     TEST_ASSERT_EQUAL_INT16(94, L.reset_y);
-    TEST_ASSERT_EQUAL_PTR(&font_styrene_48, L.pct_font);
-    TEST_ASSERT_EQUAL_PTR(&font_styrene_28, L.period_font);
-    TEST_ASSERT_EQUAL_PTR(&font_tiempos_56, L.title_font[0]);
-    TEST_ASSERT_EQUAL_PTR(&font_tiempos_56, L.title_font[1]);
+    TEST_ASSERT_EQUAL_PTR(&font_sans_48, L.pct_font);
+    TEST_ASSERT_EQUAL_PTR(&font_sans_28, L.period_font);
+    TEST_ASSERT_EQUAL_PTR(&font_serif_56, L.title_font[0]);
+    TEST_ASSERT_EQUAL_PTR(&font_serif_56, L.title_font[1]);
     TEST_ASSERT_EQUAL_INT16(30, L.title_y[0]);  TEST_ASSERT_EQUAL_INT16(256, L.title_cx);
     TEST_ASSERT_EQUAL_INT16(20, L.logo_x);      TEST_ASSERT_EQUAL_INT16(20, L.logo_y);
     TEST_ASSERT_EQUAL_INT16(412, L.batt_x);     TEST_ASSERT_EQUAL_INT16(30, L.batt_y);
     TEST_ASSERT_EQUAL_PTR(&font_mono_32, L.status_font);
     TEST_ASSERT_EQUAL_INT16(-15, L.status_y);   TEST_ASSERT_EQUAL_INT16(440, L.status_w);
-    TEST_ASSERT_EQUAL_PTR(&font_styrene_48, L.pair_font[0]);
+    TEST_ASSERT_EQUAL_PTR(&font_sans_48, L.pair_font[0]);
     TEST_ASSERT_EQUAL_INT16(100, L.pair_y);
     TEST_ASSERT_EQUAL_INT16(230, L.pair_line_y[3]);
     TEST_ASSERT_EQUAL_PTR(PILL_TEXT, L.pills);
@@ -218,11 +218,11 @@ static void test_compact_368x448(void) {
     TEST_ASSERT_EQUAL_INT16(96, L.card[0].y);   TEST_ASSERT_EQUAL_INT16(130, L.card[0].h);
     TEST_ASSERT_EQUAL_INT16(238, L.card[1].y);  TEST_ASSERT_EQUAL_INT16(328, L.card[0].w);
     TEST_ASSERT_EQUAL_INT16(48, L.bar_y);       TEST_ASSERT_EQUAL_INT16(78, L.reset_y);
-    TEST_ASSERT_EQUAL_PTR(&font_styrene_48, L.pct_font);
-    TEST_ASSERT_EQUAL_PTR(&font_tiempos_56, L.title_font[0]);
-    TEST_ASSERT_EQUAL_PTR(&font_tiempos_34, L.title_font[1]);   // 12-hour clock: one size down
-    TEST_ASSERT_EQUAL_PTR(&font_styrene_20, L.period_font);     // period line: one size down
-    TEST_ASSERT_EQUAL_PTR(&font_styrene_28, L.pair_font[0]);
+    TEST_ASSERT_EQUAL_PTR(&font_sans_48, L.pct_font);
+    TEST_ASSERT_EQUAL_PTR(&font_serif_56, L.title_font[0]);
+    TEST_ASSERT_EQUAL_PTR(&font_serif_34, L.title_font[1]);   // 12-hour clock: one size down
+    TEST_ASSERT_EQUAL_PTR(&font_sans_20, L.period_font);     // period line: one size down
+    TEST_ASSERT_EQUAL_PTR(&font_sans_48, L.pair_font[0]);
     TEST_ASSERT_EQUAL_INT16(-15, L.status_y);
 }
 
@@ -230,8 +230,8 @@ static void test_large_410x502(void) {
     L = layout_compute({ 410, 502, false });
     TEST_ASSERT_EQUAL_INT16(100, L.card[0].y);  TEST_ASSERT_EQUAL_INT16(150, L.card[0].h);
     TEST_ASSERT_EQUAL_INT16(370, L.card[0].w);
-    TEST_ASSERT_EQUAL_PTR(&font_styrene_48, L.pair_font[0]);
-    TEST_ASSERT_EQUAL_PTR(&font_tiempos_34, L.title_font[1]);
+    TEST_ASSERT_EQUAL_PTR(&font_sans_48, L.pair_font[0]);
+    TEST_ASSERT_EQUAL_PTR(&font_serif_34, L.title_font[1]);
     TEST_ASSERT_EQUAL_INT16(-15, L.status_y);
 }
 
@@ -243,21 +243,21 @@ static void test_small_240x240(void) {
     TEST_ASSERT_EQUAL_INT16(30, L.bar_y);       TEST_ASSERT_EQUAL_INT16(12, L.bar_h);
     TEST_ASSERT_EQUAL_INT16(46, L.reset_y);
     TEST_ASSERT_TRUE(L.small_icons);
-    TEST_ASSERT_EQUAL_PTR(&font_tiempos_34, L.title_font[0]);
-    TEST_ASSERT_EQUAL_PTR(&font_styrene_24, L.title_font[1]);
+    TEST_ASSERT_EQUAL_PTR(&font_serif_34, L.title_font[0]);
+    TEST_ASSERT_EQUAL_PTR(&font_sans_24, L.title_font[1]);
     TEST_ASSERT_EQUAL_INT16(4, L.title_y[0]);   TEST_ASSERT_EQUAL_INT16(128, L.title_cx);
     TEST_ASSERT_EQUAL_INT16(208, L.batt_x);     TEST_ASSERT_EQUAL_INT16(10, L.batt_y);
     TEST_ASSERT_EQUAL_PTR(&font_mono_18, L.status_font);
     TEST_ASSERT_EQUAL_INT16(-10, L.status_y);
-    TEST_ASSERT_EQUAL_PTR(&font_styrene_20, L.pair_font[0]);
+    TEST_ASSERT_EQUAL_PTR(&font_sans_20, L.pair_font[0]);
     TEST_ASSERT_EQUAL_INT16(112, L.pair_line_y[3]);
-    TEST_ASSERT_EQUAL_PTR(&font_styrene_14, L.period_font);
+    TEST_ASSERT_EQUAL_PTR(&font_sans_14, L.period_font);
 }
 
 // Kerned, per-glyph-rounded widths, as lv_font_get_glyph_width sums them.
 static void test_text_width(void) {
-    TEST_ASSERT_EQUAL_INT32(371, layout_text_width(&font_styrene_28, "for 3 seconds, then release"));
-    TEST_ASSERT_EQUAL_INT32(0, layout_text_width(&font_styrene_28, ""));
+    TEST_ASSERT_EQUAL_INT32(331, layout_text_width(&font_sans_28, "for 3 seconds, then release"));
+    TEST_ASSERT_EQUAL_INT32(0, layout_text_width(&font_sans_28, ""));
 }
 
 static void print_layouts(void) {
