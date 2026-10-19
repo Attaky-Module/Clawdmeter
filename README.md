@@ -20,90 +20,77 @@
 
 > This repository is a fork of [Clawdmeter](https://github.com/HermannBjorgvin/Clawdmeter),
 > originally developed by [Hermann Björgvin Haraldsson](https://github.com/HermannBjorgvin),
-> last modified by Attaky on **2026-07-10** from upstream **`ca8a642`** (2026-07-09),
+> last modified by Attaky on **2026-10-18** from upstream release **`v2.2.1`** (2026-10-17),
 > to add support for the **Attaky Modular Device**. Upstream is intentionally
 > unlicensed because of bundled copyrighted mascot assets — see the
 > [licensing notes](#licensing-gray-area-warning) below.
 
 A Claude Code usage dashboard for **Attaky Modular Device** hardware.
-It pairs with your computer over Bluetooth; the splash screen plays
-pixel-art Clawd animations that get busier as your usage rate climbs,
-and the physical keys double as a BLE HID keyboard for Claude Code
-shortcuts.
+It pairs with your computer over Bluetooth, shows your session and
+weekly limits, and Clawd lives on the screen: he reacts to prompts and
+alerts you when a session needs an answer. The physical keys double as
+a BLE HID keyboard for Claude Code shortcuts.
 
-|              Splash               |              Usage              |
-| :-------------------------------: | :-----------------------------: |
-| ![Splash](screenshots/attaky-splash.png) | ![Usage](screenshots/attaky-usage.png) |
-|   Splash; touch-toggle anytime    | Session and weekly utilization  |
+|                 Usage                  |                 Pairing                  |
+| :------------------------------------: | :--------------------------------------: |
+| ![Usage](screenshots/attaky-usage.png) | ![Pairing](screenshots/attaky-pairing.png) |
+|     Session and weekly limits          |   Not paired yet: hold BOOT to pair      |
 
 ## Compatible devices
 
-- **Attaky Core 1.0** — 320 × 240 landscape touchscreen, physical
-  buttons, RGB indicator, and a motion sensor (present but unused by
-  this firmware). Connects to the host over USB-C for flashing and
-  serial.
+- **Attaky Core 1.0** — 320 × 240 landscape touchscreen, D-pad and
+  side keys. Connects to the host over USB-C for flashing and serial.
 - **Attaky Power_Standard-Cell_1.0** — Li-Po battery with on-board
   fuel gauge that reports battery percentage to the firmware.
 - USB-C cable for flashing firmware and charging.
 
-The hardware POWER button is a long-press power toggle handled at
-the board level; firmware doesn't see it.
-
 ## What this fork adds on top of Clawdmeter
 
-- **Attaky Core 1.0 build target** — 320 × 240 TFT + capacitive touch
-  port of the original 480 × 480 AMOLED build, with regenerated fonts
-  and icons for the smaller panel
+- **Attaky Core 1.0 build target** — a first-class board under
+  upstream's board HAL (`firmware/src/boards/attaky_core_esp32/` + the
+  `attaky_core_esp32` PlatformIO env); the meters layout, Clawd and the
+  BLE protocol are upstream's, unchanged
 - **D-pad + side keys as a BLE HID keyboard** — arrows, Enter,
-  Shift+Tab and Space (Claude Code mode toggle / push-to-talk), read
-  through the on-board I²C IO expander
+  Shift+Tab and Space (Claude Code mode toggle / push-to-talk)
 - **Battery fuel-gauge support** — battery percentage from the Power
-  cell module shown in the UI
-- **macOS host support** — Python daemon, LaunchAgent and flash helper
-  (originally ported by [Chris Davidson](https://github.com/lorddavidson))
-  alongside the upstream Linux host
+  cell module
+- **Pairing on BOOT** — Attaky Core's POWER long-hold is a hardware
+  power switch, so the clear-pairing gesture lives on BOOT
 - **Freely licensed UI typefaces** — Source Serif 4 + Archivo (SIL OFL
-  1.1) replace the proprietary brand fonts bundled upstream
-- **BLE rename** — the device advertises as **"Attaky Claude Monitor"**;
-  the host daemons pick the name via `CLAWDMETER_DEVICE_NAME` (that is
-  already the default, so upstream Waveshare users set it to
-  `Clawdmeter`)
-
-Attaky Core is implemented as a first-class board under upstream's
-board-HAL layout (`firmware/src/boards/attaky_core_esp32/` + the
-`attaky_core_esp32` PlatformIO env), so upstream behavior (usage
-polling, BLE protocol, splash animation logic) is unchanged and future
-upstream updates stay easy to merge.
+  1.1) replace the proprietary brand fonts bundled upstream, on the
+  device and in the desktop app
+- **BLE name** — the device advertises as **"Attaky Claude Monitor"**;
+  the desktop app in this repository finds either name
 
 ## Using this fork on Attaky Core
 
-Everything general — daemon install (macOS / Linux / Windows), how it
-works, the BLE protocol, icon + splash tooling — is documented in the
+Everything general — the desktop app, hooks, settings, the BLE
+protocol — is documented in the
 [upstream README below](#-upstream-clawdmeter-readme-). The Attaky
 deltas are:
 
-- **Clone this repository** (not the upstream one) and build the
-  Attaky env: `pio run -d firmware -e attaky_core_esp32`.
-- **Flash** with the same helper scripts, passing the Attaky env:
-  `./flash-mac.sh attaky_core_esp32 [port]` on macOS,
-  `./flash.sh attaky_core_esp32 [port]` on Linux. The board's USB
-  bridge is a CH340 (driver ships with current macOS/Linux), so the
-  port is `/dev/cu.usbserial-*` / `/dev/ttyUSB0` — not the
-  `usbmodem`/`ttyACM` names upstream boards use — and flashing runs at
-  460800 baud.
-- **Device name**: this build advertises as **"Attaky Claude
-  Monitor"**, which is also the daemon default — follow the upstream
-  pairing steps with that name (upstream Waveshare builds set
-  `CLAWDMETER_DEVICE_NAME=Clawdmeter` instead).
-- **Re-pair / clear the bond** by holding **BOOT** for 3 seconds and
-  releasing. Upstream's "hold the power button" instruction does not
-  apply here: Attaky Core's POWER long-hold is a hardware power toggle
-  the firmware never sees, so the pairing gesture lives on BOOT (the
-  on-device hint says so too). After clearing, *Forget* the device in
-  your OS Bluetooth settings before reconnecting.
-- **Buttons** — Attaky Core has a D-pad and more keys than the
-  upstream boards; they act as a BLE HID keyboard on whatever window
-  has focus:
+- **Firmware**: install the ready-made build from the Attaky firmware
+  store, or clone this repository and flash the Attaky env with
+  PlatformIO:
+  `pio run -d firmware -e attaky_core_esp32 -t upload --upload-port <port>`.
+  The board uses a USB-to-serial bridge, so the port is
+  `/dev/cu.usbserial-*` on macOS or `/dev/ttyUSB0` on Linux. The
+  desktop app's built-in flasher only lists native-USB boards and does
+  not offer Attaky Core.
+- **Desktop app**: build it from this repository
+  (`cd desktop && cargo run --release -p clawdmeter-app`). It knows
+  Attaky Core's BLE name, pairing gesture and board picture. The
+  upstream release app finds a board by its data service while
+  scanning, but some reconnect paths look for the name "Clawdmeter"
+  only.
+- **Pair** **"Attaky Claude Monitor"** in your computer's Bluetooth
+  settings (upstream's steps say "Clawdmeter").
+- **Clear the pairing** by holding **BOOT** for 3 seconds and
+  releasing (the on-device hint says so too). Upstream's "hold the
+  power button" does not apply here. Then *Forget* the device in your
+  OS Bluetooth settings before reconnecting.
+- **Keys** — they act as a BLE HID keyboard on whatever window has
+  focus:
 
   | Key            | Function                                    |
   | -------------- | ------------------------------------------- |
@@ -111,34 +98,19 @@ deltas are:
   | **SELECT**     | Enter / confirm                             |
   | **L1**         | Shift+Tab (Claude Code mode toggle)         |
   | **R2**         | Space (Claude Code voice-mode push-to-talk) |
-  | **BOOT**       | Next animation on splash, back to splash from Usage · hold 3 s + release: pairing mode |
-  | **POWER**      | Short: cycle brightness (next animation on splash) |
+  | **BOOT**       | Wake the screen · hold 3 s + release: clear the pairing |
+  | **POWER**      | Short: cycle brightness · long hold: hardware power switch |
 
-  A long press of POWER is the hardware power toggle, handled below
-  the firmware.
-- **Fonts**: the UI is built on freely licensed typefaces — Source
-  Serif 4 and Archivo (SIL OFL 1.1; license texts at
-  `assets/OFL-SourceSerif4.txt` and `assets/OFL-Archivo.txt`) plus
-  DejaVu Sans Mono (mono 32/18). The upstream font-recompile section
-  below still names the proprietary fonts it was written for; on this
-  tree use `assets/SourceSerif4-Regular.ttf` (serif 56/34) and
-  `assets/Archivo-Regular.ttf` (sans 48/28/24/20/16/14) with the same
-  `lv_font_conv` flags.
-- **BLE protocol note**: in addition to the Data/RX/TX characteristics
-  in the upstream table below, the firmware exposes a REQ notify
-  characteristic (`4c41555a-4465-7669-6365-000000000004`) that fires a
-  refresh request when a subscriber connects before any data has
-  arrived.
+- **Battery**: the Power cell reports charge but not whether USB is
+  plugged in, so on USB with a full battery the screen may dim to
+  sleep as it does on battery; any key wakes it.
 
 ## Credits
 
-- Original Clawdmeter by @hermannbjorgvin.
-- macOS host pieces (daemon, LaunchAgent, flash helper) by
-  Chris Davidson (@lorddavidson).
+- Original Clawdmeter by @hermannbjorgvin and its contributors.
 - Attaky Core 1.0 hardware adaptation by the Attaky project.
-- Pixel-art Clawd animation by @amaanbuilds. Frame data and palettes
-  scraped + converted by the tooling in `tools/`.
-- Lucide icon set (MIT) for the bluetooth and battery UI glyphs.
+- macOS host pieces in earlier versions of this fork by
+  Chris Davidson (@lorddavidson).
 - UI typefaces: Source Serif 4 (Adobe, SIL OFL 1.1), Archivo
   (Omnibus-Type, SIL OFL 1.1) and DejaVu Sans Mono (Bitstream Vera
   license). OFL license texts ship in `assets/`.
@@ -146,22 +118,12 @@ deltas are:
 ## Licensing gray area warning
 
 Unlike upstream, this fork does NOT bundle Anthropic's proprietary
-brand fonts (Tiempos Text, Styrene B) — the UI was rebuilt on the
+brand fonts — the device UI and the desktop app were rebuilt on the
 freely licensed typefaces listed above. The remaining gray area is the
-Clawd mascot artwork. The original author's statement:
-
-> The software in this repository uses and adheres to the Anthropic
-> brand guidelines and uses the same proprietary fonts that Anthropic
-> has a license for but this software uses without permission as well
-> as using assets from Anthropic such as the copyrighted Clawd mascot
-> so even though the code in this repo is non-proprietary I will not
-> license it myself under a copyleft license since this repo includes
-> proprietary fonts and copyrighted assets. Please be aware of this if
-> you fork or copy the code from this repo. **You have been warned!**
-
-For this fork the font half of that warning no longer applies; the
-copyrighted Clawd mascot assets are still included as-is and are not
-relicensed.
+Clawd mascot artwork. The original author's statement is preserved in
+the upstream README below; for this fork the font half of that warning
+no longer applies, while the copyrighted Clawd mascot assets are still
+included as-is and are not relicensed.
 
 ## Support
 
@@ -173,311 +135,107 @@ relicensed.
 
 # ↓ Upstream Clawdmeter README ↓
 
-*Preserved from upstream `main` (`ca8a642`, 2026-07-09) for
-attribution and reference. The hardware and install steps below
-describe the upstream builds (Waveshare AMOLED and other community
-boards), not the Attaky Core port above; some linked docs and media
-files are not present in this fork.*
+*Preserved from upstream release `v2.2.1` (2026-10-17) for attribution
+and reference, with the Attaky Core row added to the board table. The
+install and quick-start steps describe the upstream app release and
+the upstream boards; for Attaky Core see the section above.*
 
 # Clawdmeter
 
-A small ESP32 dashboard I made for my desk to keep an eye on Claude Code usage.
-
-It runs on a [Waveshare ESP32-S3-Touch-AMOLED-2.16](https://www.waveshare.com/esp32-s3-touch-amoled-2.16.htm?&aff_id=149786) as well as a few other alternative boards and pairs over Bluetooth, the splash screen plays pixel-art Clawd animations that get
-busier when your usage rate climbs. The two side buttons send Space and
-Shift+Tab over BLE HID for Claude Code's voice mode and mode-toggle shortcuts.
-
-|              Usage meter              |              Clawd animation screen              |
-| :-----------------------------------: | :----------------------------------------------: |
-| ![Usage meter](assets/demo.jpeg) | ![Clawd animation screen](assets/demo.gif) |
-
-The Clawd animations come from [claudepix](https://claudepix.vercel.app), [@amaanbuilds](https://x.com/amaanbuilds)'s library of pixel-art Clawd sprites, check it out, it's lovely.
-
-## Screens
-
-The device boots into the splash. Tap the screen anywhere to switch to the Usage view; tap again to flip back to the splash.
-
-|              Splash               |              Usage              |
-| :-------------------------------: | :-----------------------------: |
-| ![Splash](screenshots/splash.png) | ![Usage](screenshots/usage.png) |
-|   Splash; touch-toggle anytime    | Session and weekly utilization  |
-
-While the splash is up, the middle (PWR) button cycles animations. **Hold the power button for 3 seconds, then release, to put the device into pairing mode** — this clears the saved Bluetooth bond and re-advertises. The firmware also auto-rotates animations every 20 s within the current usage-rate group, so a long stretch on the splash isn't just one Clawd on loop.
-
-## Hardware
-
-Boards supported out of the box:
-
-- [Waveshare ESP32-S3-Touch-AMOLED-2.16](https://www.waveshare.com/esp32-s3-touch-amoled-2.16.htm?&aff_id=149786)
-- [Waveshare ESP32-C6-Touch-AMOLED-2.16](https://www.waveshare.com/esp32-c6-touch-amoled-2.16.htm?&aff_id=149786) 
-- [Waveshare ESP32-S3-Touch-AMOLED-1.8](https://www.waveshare.com/esp32-s3-touch-amoled-1.8.htm?&aff_id=149786)
-- [Waveshare ESP32-C6-Touch-AMOLED-1.8](https://www.waveshare.com/esp32-c6-touch-amoled-1.8.htm?&aff_id=149786)
-
-> Please check if a pull request exists for your alternative hardware port before opening a new one, providing QA feedback and testing on the same hardware is more valuable than duplicate pull requests.
-
-**Porting to another board:** the firmware is a thin HAL with per-board folders under `firmware/src/boards/`. Drop in a new folder and a new PlatformIO env — `main.cpp`, `ui.cpp`, and `splash.cpp` never need to change. See [`docs/porting/adding-a-board.md`](docs/porting/adding-a-board.md) for the walk-through and [`docs/porting/hal-contract.md`](docs/porting/hal-contract.md) for the interfaces a port must implement.
-
-## Prerequisites
-
-- Linux (tested on Ubuntu), macOS, or Windows 10/11
-- [PlatformIO CLI](https://docs.platformio.org/en/latest/core/installation/index.html)
-- Linux: `curl`, `bluetoothctl`, `busctl` (BlueZ Bluetooth stack)
-- macOS: `python3` (the installer sets up a venv with `bleak` and `httpx`)
-- Windows: `python3` 3.11+ (the installer sets up a venv with `bleak`, `httpx`, and `pystray`)
-- Claude Code with an active subscription
-
-## macOS installation
-
-The macOS host pieces — Python daemon, LaunchAgent, and flash helper — were ported by [Chris Davidson (@lorddavidson)](https://github.com/lorddavidson). Thanks Chris!
-
-### Flash the firmware
-
-```bash
-./flash-mac.sh waveshare_amoled_216                       # auto-detects /dev/cu.usbmodem*
-./flash-mac.sh waveshare_amoled_18  /dev/cu.usbmodem1101  # or pass an explicit USB serial port
-```
-
-The board env name is required. Run `./flash-mac.sh` with no args to see the available envs (scraped from `firmware/platformio.ini`).
-
-### Pair the device
-
-After flashing, open **System Settings → Bluetooth** and click *Connect* next to "Clawdmeter". The daemon only ever connects to the peripheral this Mac is paired/connected to — it never scans for a nearby device — so once it's connected here the daemon picks it up on its next poll (~60 s).
-
-### Install the daemon
-
-The daemon reads your Claude OAuth token from the macOS Keychain (service `Claude Code-credentials`), polls usage every 60 s, and pushes it to the display over BLE.
-
-```bash
-./install-mac.sh
-```
-
-The installer creates a Python venv in `daemon/.venv/`, installs `bleak` and `httpx`, renders a LaunchAgent into `~/Library/LaunchAgents/com.user.claude-usage-daemon.plist`, and loads it. The first run is launched interactively so macOS prompts for Bluetooth permission.
-
-Useful commands:
-
-```bash
-launchctl list | grep claude-usage                                          # check it's running
-tail -F ~/Library/Logs/claude-usage-daemon.out.log                          # live logs
-launchctl unload ~/Library/LaunchAgents/com.user.claude-usage-daemon.plist  # stop
-launchctl load -w ~/Library/LaunchAgents/com.user.claude-usage-daemon.plist # start
-```
-
-## Linux installation
-
-### Flash the firmware
-
-```bash
-./flash.sh waveshare_amoled_216                  # defaults to /dev/ttyACM0
-./flash.sh waveshare_amoled_18  /dev/ttyACM1     # or pass an explicit USB serial port
-```
-
-The board env name is required. Run `./flash.sh` with no args to see the available envs (scraped from `firmware/platformio.ini`).
-
-### Pair the device
-
-After flashing, the device advertises as "Clawdmeter". Pair it once:
-
-```bash
-# Scan for the device
-bluetoothctl scan le
-
-# When "Clawdmeter" appears, pair and trust it
-bluetoothctl pair F4:12:FA:C0:8F:E5    # use your device's MAC
-bluetoothctl trust F4:12:FA:C0:8F:E5
-```
-
-To re-pair later, hold the power button for 3 seconds then release — the device clears its saved bond and re-advertises.
-
-### Install the daemon
-
-The daemon polls your Claude usage every 60 seconds and sends it to the display over BLE.
-
-```bash
-./install.sh
-systemctl --user start claude-usage-daemon
-```
-
-Check status: `systemctl --user status claude-usage-daemon`
-
-View logs: `journalctl --user -u claude-usage-daemon -f`
-
-## Windows installation
-
-Runs natively on Windows — no WSL required. A system-tray app polls your usage and pushes it over BLE, and starts automatically at login.
-
-### Prerequisites
-
-- **Native Windows** (not WSL).
-- **Python 3.11+** from [python.org](https://www.python.org/downloads/) — check *"Add python.exe to PATH"* during install.
-- **Claude Code** installed, with `claude login` completed. The token is read from `%USERPROFILE%\.claude\.credentials.json` (falling back to `%LOCALAPPDATA%\Claude\` then `%APPDATA%\Claude\`).
-- The repo on a **native Windows path** (e.g. `%USERPROFILE%\Clawdmeter`), **not** a `\\wsl$` share — the installer refuses a WSL path.
-
-### Flash the firmware
-
-```powershell
-pio run -d firmware -e waveshare_amoled_216 -t upload --upload-port COM5   # use your device's COM port
-```
-
-Run `pio run -d firmware` with no env to see the available board envs.
-
-### Pair the device
-
-The device is a bonded BLE HID keyboard, so pair it once: **Settings → Bluetooth & devices → Add device → Bluetooth**, then select "Clawdmeter". Pairing is **required** — it enables the physical buttons and keeps a persistent connection (the device keeps showing your last-synced usage even after the daemon quits). To undo, use **Remove device** (this disables the buttons).
-
-### Install the daemon (recommended)
-
-From the repo root in PowerShell:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File install-windows.ps1
-```
-
-This creates a venv, installs `bleak`/`httpx`/`pystray`/`Pillow` from the in-repo requirements (no internet downloads), registers a per-user login-autostart entry (`HKCU\…\Run`, no admin needed), and launches the tray app headlessly (no console window).
-
-### Run manually instead (optional)
-
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1        # if blocked: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned, then retry
-pip install -r daemon\requirements-windows.txt
-python daemon\claude_usage_daemon_windows.py        # runs in the foreground; Ctrl+C to stop
-```
-
-### Tray icon and menu
-
-The icon's corner bubble shows state — **green** Connected, **amber** Scanning, **red** Error — and hovering shows the status (`Connected · last update HH:MM`). A notification fires once when it enters Error (e.g. an expired token). Right-click for the menu:
-
-- **Status header** — live state + last sync time.
-- **Start at login** — toggle autostart on/off.
-- **Quit** — stops the daemon cleanly; leaves the Windows pairing intact (device keeps its last reading).
-
-### Logs and troubleshooting
-
-```powershell
-Get-Content $env:LOCALAPPDATA\Clawdmeter\daemon.log -Tail 30        # view logs
-reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v Clawdmeter /f   # remove autostart
-```
-
-| Symptom | Fix |
-|---------|-----|
-| `Device not found` | Power on the device; make sure it's in range and paired. |
-| `token expired` toast / `API HTTP 401` | Re-run `claude login`, then restart the daemon. |
-| `Connection failed` | Toggle Windows Bluetooth off/on in Settings. |
-| `Warning: running under Linux/WSL` | Run from a native PowerShell window, not a WSL shell. |
-
-## How it works
-
-1. The daemon reads your Claude Code OAuth token — from the macOS Keychain (service `Claude Code-credentials`) on macOS, or from `~/.claude/.credentials.json` on Linux (`%USERPROFILE%\.claude\.credentials.json` on Windows).
-2. It makes a minimal API call to `api.anthropic.com/v1/messages` — one token of Haiku, basically free.
-3. The usage numbers come straight out of the response headers (`anthropic-ratelimit-unified-5h-utilization` and friends).
-4. The daemon connects to the ESP32 over BLE and writes a JSON payload to the GATT RX characteristic.
-5. The firmware parses it and updates the LVGL dashboard.
-6. The firmware also tracks the rate of change of session % over a 5-minute window and picks splash animations from the matching mood group.
-7. The two side buttons are independent of all of this — they send Space and Shift+Tab as BLE HID keyboard input to the paired host directly.
-
-## Physical buttons
-
-The board has three side buttons. Left and right send HID keys; the middle (PWR) button cycles splash animations and, held for 3 seconds, triggers pairing mode.
-
-| Button           | GPIO         | Function                                                       |
-| ---------------- | ------------ | -------------------------------------------------------------- |
-| **Left**         | GPIO 0       | Hold to send Space (Claude Code voice-mode push-to-talk)       |
-| **Middle** (PWR) | AXP2101 PKEY | On splash: cycle animations. Hold 3s + release: pairing mode |
-| **Right**        | GPIO 18      | Press to send Shift+Tab (Claude Code mode toggle)              |
-
-Space and Shift+Tab go out as standard BLE HID keyboard reports, so they trigger in whatever window has focus on the paired host — not just Claude Code.
-
-## BLE protocol
-
-The device advertises a custom GATT service alongside the standard HID keyboard service:
-
-|                            | UUID                                   |
-| -------------------------- | -------------------------------------- |
-| **Data Service**           | `4c41555a-4465-7669-6365-000000000001` |
-| RX Characteristic (write)  | `4c41555a-4465-7669-6365-000000000002` |
-| TX Characteristic (notify) | `4c41555a-4465-7669-6365-000000000003` |
-| **HID Service**            | `00001812-0000-1000-8000-00805f9b34fb` |
-
-JSON payload format (written to RX):
-
-```json
-{ "s": 45, "sr": 120, "w": 28, "wr": 7200, "st": "allowed", "ok": true }
-```
-
-Fields: `s` = session %, `sr` = session reset (minutes), `w` = weekly %, `wr` = weekly reset (minutes), `st` = status, `ok` = success flag.
-
-## Recompiling fonts
-
-The `firmware/src/font_*.c` files are pre-compiled LVGL bitmap fonts.
-
-```bash
-npm install -g lv_font_conv
-```
-
-Generate each one (one at a time — `lv_font_conv` doesn't like loop-driven invocations) with `--no-compress` (required for LVGL 9):
-
-```bash
-# Tiempos Text (titles, 56px)
-lv_font_conv --font assets/TiemposText-400-Regular.otf -r 0x20-0x7E \
-  --size 56 --format lvgl --bpp 4 --no-compress \
-  -o firmware/src/font_tiempos_56.c --lv-include "lvgl.h"
-
-# Styrene B (large numbers 48, panel labels 28, small text 24, minimal 20)
-for size in 48 28 24 20; do
-  lv_font_conv --font assets/StyreneB-Regular.otf -r 0x20-0x7E \
-    --size $size --format lvgl --bpp 4 --no-compress \
-    -o firmware/src/font_styrene_${size}.c --lv-include "lvgl.h"
-done
-
-# DejaVu Sans Mono (32px, with spinner Unicode chars)
-lv_font_conv --font assets/DejaVuSansMono.ttf \
-  -r 0x20-0x7E,0xB7,0x2026,0x2722,0x2733,0x2736,0x273B,0x273D \
-  --size 32 --format lvgl --bpp 4 --no-compress \
-  -o firmware/src/font_mono_32.c --lv-include "lvgl.h"
-```
-
-**Important:** `lv_font_conv` v1.5.3 outputs LVGL 8 format. Each generated file must be patched for LVGL 9 compatibility:
-
-1. Remove `#if LVGL_VERSION_MAJOR >= 8` guards around `font_dsc` and the font struct
-2. Remove the `.cache` field from `font_dsc`
-3. Add `.release_glyph = NULL`, `.kerning = 0`, `.static_bitmap = 0` to the font struct
-4. Add `.fallback = NULL`, `.user_data = NULL` to the font struct
-
-Without these patches, fonts compile but render as invisible.
-
-## Converting Lucide icons
-
-The UI uses a small set of [Lucide](https://lucide.dev) icons (bluetooth + battery states) converted to RGB565 / RGB565A8 C arrays for LVGL.
-
-```bash
-node tools/png_to_lvgl.js assets/icon_bluetooth_48.png icon_bluetooth_data ICON_BLUETOOTH_WIDTH ICON_BLUETOOTH_HEIGHT
-```
-
-Default tint is white (`0xFFFFFF`); Lucide PNGs ship as black-on-transparent and would render invisible against the dark UI without it. Pass `--no-tint` for pre-coloured artwork like the logo. Battery icons use RGB565A8 (alpha plane) so they blend cleanly over the splash; the rest are baked RGB565 over the panel colour. Paste the converter output into `firmware/src/icons.h`.
-
-## Splash animations
-
-The animations come from [claudepix.vercel.app](https://claudepix.vercel.app),
-a library of Clawd sprites. `tools/scrape_claudepix.js` evaluates the
-site's JavaScript in a Node VM to pull out frame data and palettes, then
-`tools/convert_to_c.js` turns everything into RGB565 C arrays and writes
-`firmware/src/splash_animations.h`.
-
-To re-pull (e.g. when the source library updates):
-
-```bash
-node tools/scrape_claudepix.js
-node tools/convert_to_c.js
-pio run -d firmware -t upload
-```
-
-See `tools/README.md` for details.
-
-## Credits
-
-- Pixel-art Clawd animation by [@amaanbuilds](https://x.com/amaanbuilds), sourced from [claudepix.vercel.app](https://claudepix.vercel.app). Frame data and palettes scraped + converted by the tooling in `tools/`.
-- Lucide icon set ([lucide.dev](https://lucide.dev), MIT) for bluetooth and battery UI glyphs.
-- Anthropic brand fonts (Tiempos Text, Styrene B) — see licensing warning below.
+![Two Clawdmeter devices: Clawd's face on the left, session and weekly usage on the right](docs/images/clawdmeter-hero.jpg)
+
+Clawdmeter shows your Claude Code usage limits on an ESP32 development board on your desk. Clawd lives on the device. He reacts to prompts, cheers you on, and alerts you when a session needs your attention.
+
+## Supported boards
+
+### Flagship
+
+The reference board: everything is developed and tested on it first.
+
+|                                                                                                        | Board                                                                                                           |                                                                                               |
+| :----------------------------------------------------------------------------------------------------: | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+|  <img src="desktop/crates/clawdmeter-app/assets/boards/waveshare_amoled_216.svg" height="90" alt="">   | [Waveshare ESP32-S3-Touch-AMOLED-2.16](https://www.waveshare.com/esp32-s3-touch-amoled-2.16.htm?&aff_id=149786) | 480×480 AMOLED, 3 buttons, speaker. Original board.                                           |
+
+### Stable
+
+Supported on every release.
+
+|                                                                                                        | Board                                                                                                           |                                                                                               |
+| :----------------------------------------------------------------------------------------------------: | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| <img src="desktop/crates/clawdmeter-app/assets/boards/waveshare_amoled_216_c6.svg" height="90" alt=""> | [Waveshare ESP32-C6-Touch-AMOLED-2.16](https://www.waveshare.com/esp32-c6-touch-amoled-2.16.htm?&aff_id=149786) | 480×480 AMOLED on the ESP32-C6 (no PSRAM; animated corner Clawd, text-only attention alerts). |
+|   <img src="desktop/crates/clawdmeter-app/assets/boards/waveshare_amoled_18.svg" height="90" alt="">   | [Waveshare ESP32-S3-Touch-AMOLED-1.8](https://www.waveshare.com/esp32-s3-touch-amoled-1.8.htm?&aff_id=149786)   | 368×448 AMOLED, 2 buttons, speaker.                                                           |
+| <img src="desktop/crates/clawdmeter-app/assets/boards/waveshare_amoled_18_c6.svg" height="90" alt="">  | [Waveshare ESP32-C6-Touch-AMOLED-1.8](https://www.waveshare.com/esp32-c6-touch-amoled-1.8.htm?&aff_id=149786)   | 368×448 AMOLED on the ESP32-C6.                                                               |
+|  <img src="desktop/crates/clawdmeter-app/assets/boards/waveshare_amoled_206.svg" height="90" alt="">   | [Waveshare ESP32-S3-Touch-AMOLED-2.06](https://www.waveshare.com/esp32-s3-touch-amoled-2.06.htm?&aff_id=149786) | 410×502 AMOLED in a watch case.                                                               |
+|    <img src="desktop/crates/clawdmeter-app/assets/boards/waveshare_lcd_154.svg" height="90" alt="">    | [Waveshare ESP32-S3-Touch-LCD-1.54](https://www.waveshare.com/esp32-s3-lcd-1.54.htm?sku=33869&aff_id=149786)    | 240×240 IPS, 3 buttons, speaker. Smallest supported display.                                  |
+|     <img src="desktop/crates/clawdmeter-app/assets/boards/waveshare_lcd_4.svg" height="90" alt="">     | [Waveshare ESP32-S3-Touch-LCD-4](https://www.waveshare.com/esp32-s3-touch-lcd-4.htm?&aff_id=149786)             | 480×480 IPS, 4 inches, one button.                                                            |
+| <img src="desktop/crates/clawdmeter-app/assets/boards/lilygo_t4s3.svg" height="90" alt=""> | [LILYGO T4-S3](https://lilygo.cc/products/t4-s3) | 450×600 AMOLED, one button (BOOT; long-hold cycles brightness / scene). |
+
+### Experimental
+
+Ports contributed by the community. Expect rough edges: bugs, or a layout
+that isn't optimal for the panel. If something is off, fix it and open a PR.
+If everything works, tell us in the
+[Board support reports](https://github.com/HermannBjorgvin/Clawdmeter/discussions/222)
+discussion (env name, firmware version, a photo) and we'll move the board to
+Stable.
+
+|                                                                                                        | Board                                                                                                           |                                                                                               |
+| :----------------------------------------------------------------------------------------------------: | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| <img src="desktop/crates/clawdmeter-app/assets/boards/waveshare_lcd_183.svg" height="90" alt=""> | [Waveshare ESP32-S3-Touch-LCD-1.83](https://www.waveshare.com/esp32-s3-touch-lcd-1.83.htm?&aff_id=149786) | 240×284 IPS SPI TFT, BOOT + PWR buttons, rounded watch-style case. |
+| <img src="desktop/crates/clawdmeter-app/assets/boards/esp32_s3_4848s040.svg" height="90" alt=""> | [Guition ESP32-S3-4848S040 (4-inch 480×480)](https://www.aliexpress.com/item/3256806115962222.html) | 480×480 ST7701S RGB panel, GT911 touch, no buttons. Pair from the computer. |
+| <img src="desktop/crates/clawdmeter-app/assets/boards/waveshare_amoled_143.svg" height="90" alt=""> | [Waveshare ESP32-S3-Touch-AMOLED-1.43](https://www.waveshare.com/esp32-s3-touch-amoled-1.43.htm?&aff_id=149786) | 466×466 round AMOLED. BOOT is the only button (push-to-talk); pair by touch hold. |
+| <img src="desktop/crates/clawdmeter-app/assets/boards/waveshare_amoled_132.svg" height="90" alt=""> | [Waveshare ESP32-S3-Touch-AMOLED-1.32](https://www.waveshare.com/esp32-s3-touch-amoled-1.32.htm?&aff_id=149786) | 466×466 round AMOLED. BOOT rotates the UI; no HID buttons. |
+| <img src="desktop/crates/clawdmeter-app/assets/boards/esp32_2432s024c.svg" height="90" alt=""> | [ESP32-2432S024C Cheap Yellow Display (portrait)](https://www.amazon.com/dp/B0CLGD2DG6) | 240×320 ST7789, CST820 capacitive touch, classic ESP32 without PSRAM. One button (BOOT = PWR role: brightness, hold to pair). Env `esp32_2432s024c` (portrait) or `esp32_2432s024c_landscape` (320×240). |
+| <img src="desktop/crates/clawdmeter-app/assets/boards/esp32_2432s028r.svg" height="90" alt=""> | [ESP32-2432S028R "Cheap Yellow Display"](https://www.amazon.com/dp/B0BVFXR313) | 240×320 ILI9341, XPT2046 resistive touch, classic ESP32 without PSRAM. One button (BOOT = PWR role: brightness, hold to pair). Env `esp32_2432s028r` (portrait) or `esp32_2432s028r_landscape` (320×240). |
+| <img src="desktop/crates/clawdmeter-app/assets/boards/m5sticks3.svg" height="90" alt=""> | [M5Stack M5StickS3](https://shop.m5stack.com/products/m5sticks3-esp32s3-mini-iot-dev-kit) | 135×240 ST7789P3 stick, no touch, speaker. BtnA is Space/voice, BtnB is PWR. |
+| <img src="desktop/crates/clawdmeter-app/assets/boards/m5stack_fire.svg" height="90" alt=""> | [M5Stack FIRE IoT Development Kit (PSRAM) V2.7](https://shop.m5stack.com/products/m5stack-fire-iot-development-kit-psram-v2-7) | 320×240 IPS, classic ESP32 with PSRAM, no touch screen: A = Space, C = Shift+Tab, B = PWR (brightness, hold to pair). |
+| <img src="desktop/crates/clawdmeter-app/assets/boards/lilygo_t_display_s3.svg" height="90" alt=""> | [LILYGO T-Display S3](https://lilygo.cc/products/t-display-s3) | 170×320 IPS TFT, no touch. BOOT is push-to-talk, the second button (IO14) is the PWR role. |
+| <img src="desktop/crates/clawdmeter-app/assets/boards/waveshare_lcd_2.svg" height="90" alt=""> | [Waveshare ESP32-S3-Touch-LCD-2](https://www.waveshare.com/esp32-s3-touch-lcd-2.htm?&aff_id=149786) | 240×320 IPS, 2 inches, touch-only (no usable buttons). |
+| <img src="desktop/crates/clawdmeter-app/assets/boards/waveshare_epaper_154.svg" height="90" alt=""> | [Waveshare ESP32-S3-ePaper-1.54](https://www.waveshare.com/esp32-s3-epaper-1.54.htm?&aff_id=149786) | 200×200 black-and-white e-paper, no touch. Minimal UI, slow partial refresh. |
+| <img src="desktop/crates/clawdmeter-app/assets/boards/xingzhi_cube_183.svg" height="90" alt=""> | [Xingzhi Cube 1.83 inch TFT WiFi (2-mic)](https://www.aliexpress.com/item/1005010442374066.html) | 284×240 landscape TFT, no touch, 3 buttons. Vendor init table on the ST7789 driver. |
+| <img src="desktop/crates/clawdmeter-app/assets/boards/freenove_s3_display_nontouch.svg" height="90" alt=""> | [Freenove ESP32-S3 Display 2.8 inch (non-touch, FNK0104A)](https://store.freenove.com/products/fnk0104) | 240×320 IPS, no touch. Minimal UI: meters and a still Clawd; BOOT: brightness, hold to pair. |
+| <img src="desktop/crates/clawdmeter-app/assets/boards/sensecap_indicator_d1l.svg" height="90" alt=""> | [Seeed Studio SenseCAP Indicator D1L](https://www.seeedstudio.com/SenseCAP-Indicator-D1L-p-5646.html) | 480×480 RGB touch screen. Side button: brightness / hold to pair; no HID buttons or sound. |
+| <img src="desktop/crates/clawdmeter-app/assets/boards/spotpear_s3_154.svg" height="90" alt=""> | [SpotPear ESP32-S3-LCD-1.54 MUMA (touch)](https://spotpear.com/shop/ESP32-S3-AI-1.54-inch-LCD-Display-TouchScreen-N16R8-muma-DeepSeek.html) | 240×240 ST7789 SPI LCD, CST816 touch, no PMU. BOOT is the only button. |
+| <img src="desktop/crates/clawdmeter-app/assets/boards/attaky_core_esp32.svg" height="90" alt=""> | [Attaky Core ESP32](https://shop.attaky.com) | 320×240 touch TFT, D-pad + keys as a BLE keyboard, Power cell battery. Hold BOOT 3 s to clear the pairing (POWER is a hardware power switch). Env `attaky_core_esp32`. |
+
+## Install
+
+Download the app from the [latest release](https://github.com/HermannBjorgvin/Clawdmeter/releases/latest).
+
+| OS             | Package     | Install                                                                                                                          |
+| -------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| macOS          | `.dmg`      | Drag Clawdmeter to Applications. If blocked, use **System Settings → Privacy & Security → Open Anyway**. Allow Bluetooth access. |
+| Windows        | `.msi`      | Run the installer. If SmartScreen blocks it, choose **More info → Run anyway**.                                                  |
+| Debian, Ubuntu | `.deb`      | `sudo apt install ./clawdmeter_<version>_amd64.deb`                                                                              |
+| Other Linux    | `.AppImage` | `chmod +x clawdmeter-*.AppImage`, then run it.                                                                                   |
+| NixOS, Nix     | Flake       | `nix run github:HermannBjorgvin/Clawdmeter`                                                                                      |
+
+The macOS and Windows packages aren't signed with a publisher certificate.
+See the [user guide](docs/user-guide.md#installation) for Linux requirements,
+portable archives, and Nix setup.
+
+## Quick start
+
+1. Launch Clawdmeter and follow setup. Connect the board with a USB data
+   cable, check the selected board, and install firmware.
+2. Pair **Clawdmeter** in your computer's Bluetooth settings. It appears as
+   a keyboard because its buttons send key presses.
+3. Open **Hooks** to let Clawd react to Claude Code activity and alert when
+   a session needs an answer. Review the changes before saving.
+   Usage meters work without hooks.
+4. Enable **Settings → Start at login** if you want the app to launch when
+   you sign in.
+
+![Clawdmeter desktop app showing device status and usage](desktop/docs/screenshots/overview.png)
+
+## Docs
+
+- [User guide](docs/user-guide.md): setup, device controls, settings, and connection help.
+- [Development](docs/development.md): builds, simulator, and releases.
+- [Add a board](docs/porting/adding-a-board.md): hardware ports and app integration.
+- [BLE protocol](docs/protocol.md): payload fields and notifications.
+- [Clawd's director](docs/clawd-director.md): behavior and character rules.
+- [Legacy daemon parity](docs/daemon-parity.md): upgrade steps and implementation differences.
 
 ## Licensing gray area warning
 

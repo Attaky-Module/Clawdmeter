@@ -45,7 +45,7 @@
 // Direct BOOT button, active low. Used as UI navigation on Attaky Core.
 #define BOOT_BTN_PIN 38
 
-#define BOARD_HAS_SECONDARY_BUTTON 0
+#define BOARD_HAS_SECONDARY_BUTTON 1
 #define BOARD_HAS_ROTATION         0
 #define BOARD_HAS_IMU              0
 #define BOARD_HAS_BATTERY          1

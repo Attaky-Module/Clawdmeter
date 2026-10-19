@@ -10,19 +10,40 @@
 // goes here so shared code stays free of #ifdef BOARD_*.
 struct BoardCaps {
     const char* name;        // human-readable, e.g. "Waveshare AMOLED 2.16"
-    const char* ble_name;    // advertised BLE name, e.g. "Clawdmeter"
-    // Button named by the on-screen pairing hint. NULL = "the power button"
-    // (upstream boards). Boards whose power button is a hardware-level power
-    // toggle route hold-to-pair to another button and set this label.
-    const char* pair_button_label;
 
     int16_t width;           // active display width in pixels
     int16_t height;          // active display height in pixels
+    bool    round_panel;     // the visible panel is a circle inscribed in
+                             // width x height (round AMOLEDs); the meters
+                             // keep inside it (layout.h)
 
-    uint8_t button_count;    // 1 = primary (BOOT) only; 2 = primary + secondary
+    uint8_t button_count;    // 0 = no primary/secondary: the PWR-role key is the
+                             // only button (or there is none); 1 = primary
+                             // (BOOT) only; 2 = primary + secondary
     bool    has_rotation;    // IMU-driven CPU rotation in the flush callback
     bool    has_battery;     // AXP2101 battery measurement is meaningful
     bool    has_imu;         // QMI8658 (or compatible) is populated
+    bool    minimal_ui;      // minimal mode: meters + a still corner Clawd,
+                             // nothing else animates (e-ink, slow panels).
+                             // Shared code reads it through minimal_mode().
+    bool    has_pwr_button;  // a PWR-role button reaches the firmware (AXP PKEY,
+                             // expander pin or GPIO): brightness and
+                             // hold-to-pair. Without one (LCD-4: KEY/PWR is a
+                             // hardware reset) a 5 s touch hold on the pairing
+                             // hint clears the bonds instead (pair_hold.h).
+    bool    has_touch;       // a touchscreen. Without one BOOT (the only
+                             // button when button_count is 0) dismisses an
+                             // active alert before it does anything else
+                             // (director_button).
+
+    // Optional; zero (omitted from a board's initializer) keeps upstream
+    // behavior.
+    const char* ble_name;    // advertised BLE name; NULL = "Clawdmeter"
+    bool    pair_on_boot;    // hold-to-pair is sourced from BOOT, not PWR
+                             // (PWR long-hold is a hardware power toggle):
+                             // the pairing hint names BOOT. The board's
+                             // power_hal still reports the BOOT long/release
+                             // edges as pwr_long_pressed / pwr_released.
 };
 
 const BoardCaps& board_caps(void);

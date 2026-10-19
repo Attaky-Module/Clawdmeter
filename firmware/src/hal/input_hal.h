@@ -13,6 +13,11 @@
 // The PWR button is owned by power_hal (it's tied to the PMU on some boards
 // and to an IO expander on others — see power_hal_pwr_pressed()).
 
+//
+// Boards with more keys (Attaky Core: D-pad + SELECT, and BOOT as a
+// non-HID UI key) report them through the extended values below; boards
+// without them return false, so shared code may poll them unconditionally.
+
 enum InputButton {
     INPUT_BTN_PRIMARY = 0,
     INPUT_BTN_SECONDARY = 1,
@@ -21,8 +26,6 @@ enum InputButton {
     INPUT_BTN_LEFT,
     INPUT_BTN_RIGHT,
     INPUT_BTN_SELECT,
-    INPUT_BTN_L1,
-    INPUT_BTN_R2,
     INPUT_BTN_UI_NAV,
     INPUT_BTN_COUNT,
 };

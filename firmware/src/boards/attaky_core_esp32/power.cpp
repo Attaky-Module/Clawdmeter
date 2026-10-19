@@ -123,7 +123,10 @@ void power_hal_tick(void) {
 
 int power_hal_battery_pct(void) { return cached_pct; }
 bool power_hal_is_charging(void) { return cached_charging; }
-bool power_hal_is_vbus_in(void) { return cached_charging; }
+// No VBUS or charger-status signal reaches the MCU. A positive charge rate
+// means USB is in; no fuel gauge means no Power cell, so the board can only
+// be running from USB. On USB with a full battery this reads false.
+bool power_hal_is_vbus_in(void) { return !gauge_ok || cached_charging; }
 
 bool power_hal_pwr_pressed(void) {
     if (pwr_pressed_flag) { pwr_pressed_flag = false; return true; }

@@ -5,7 +5,7 @@
 #include <XPowersLib.h>
 
 // PWR button comes from AXP2101 PKEY IRQs:
-//   SHORT    — quick tap (cycle splash animations)
+//   SHORT    — quick tap (cycle brightness)
 //   LONG     — ~1.5s mark, starts the hold-to-pair countdown
 //   POSITIVE — release edge, completes/cancels the gesture
 
@@ -34,6 +34,13 @@ void power_hal_init(void) {
 
     pmu.enableBattDetection();
     pmu.enableBattVoltageMeasure();
+
+    // The AXP2101 estimates % from the battery voltage and can latch into a
+    // bad state (frozen, or stuck near zero) that a power cycle doesn't
+    // clear: the gauge lives in the always-on domain the battery keeps
+    // alive. Reset it at boot so it recalibrates from the current voltage.
+    pmu.enableGauge();
+    pmu.resetGauge();
 
     pmu.disableIRQ(XPOWERS_AXP2101_ALL_IRQ);
     pmu.clearIrqStatus();

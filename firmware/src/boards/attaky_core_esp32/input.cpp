@@ -5,34 +5,30 @@
 
 #define POLL_MS      15
 #define DEBOUNCE_MS  30
+#define NO_BIT       0xFF
 
 struct ButtonState {
-    uint8_t bit;
+    uint8_t bit;          // AW9523_B Port0 bit, or NO_BIT for BOOT (GPIO)
     bool stable;
     bool last_raw;
     uint32_t last_change_ms;
 };
 
-static ButtonState expander_buttons[INPUT_BTN_COUNT] = {
-    [INPUT_BTN_PRIMARY]   = { 0xFF, false, false, 0 },
-    [INPUT_BTN_SECONDARY] = { 0xFF, false, false, 0 },
+static ButtonState buttons[INPUT_BTN_COUNT] = {
+    [INPUT_BTN_PRIMARY]   = { BTN_BIT_R2,     false, false, 0 },
+    [INPUT_BTN_SECONDARY] = { BTN_BIT_L1,     false, false, 0 },
     [INPUT_BTN_UP]        = { BTN_BIT_UP,     false, false, 0 },
     [INPUT_BTN_DOWN]      = { BTN_BIT_DOWN,   false, false, 0 },
     // LEFT/RIGHT intentionally cross the BTN_BIT_* names: the board-internal
     // pin labels are mirrored vs the physical key positions (physically-left
     // key = P01 = BTN_BIT_RIGHT, physically-right = P03 = BTN_BIT_LEFT),
-    // verified on hardware. Same compensation as the pre-HAL port.
+    // verified on hardware.
     [INPUT_BTN_LEFT]      = { BTN_BIT_RIGHT,  false, false, 0 },
     [INPUT_BTN_RIGHT]     = { BTN_BIT_LEFT,   false, false, 0 },
     [INPUT_BTN_SELECT]    = { BTN_BIT_SELECT, false, false, 0 },
-    [INPUT_BTN_L1]        = { BTN_BIT_L1,     false, false, 0 },
-    [INPUT_BTN_R2]        = { BTN_BIT_R2,     false, false, 0 },
-    [INPUT_BTN_UI_NAV]    = { 0xFF, false, false, 0 },
+    [INPUT_BTN_UI_NAV]    = { NO_BIT,         false, false, 0 },
 };
 
-static bool boot_stable = false;
-static bool boot_last_raw = false;
-static uint32_t boot_change_ms = 0;
 static uint32_t last_poll_ms = 0;
 
 static void debounce(ButtonState* b, bool raw, uint32_t now) {
@@ -52,17 +48,11 @@ static void poll_buttons(void) {
     last_poll_ms = now;
 
     uint8_t p0 = io_expander_buttons_raw();
-    for (int i = INPUT_BTN_UP; i <= INPUT_BTN_R2; i++) {
-        ButtonState* b = &expander_buttons[i];
-        debounce(b, (p0 & (1 << b->bit)) == 0, now);
-    }
-
-    bool boot_raw = digitalRead(BOOT_BTN_PIN) == LOW;
-    if (boot_raw != boot_last_raw) {
-        boot_last_raw = boot_raw;
-        boot_change_ms = now;
-    } else if (boot_raw != boot_stable && (now - boot_change_ms) >= DEBOUNCE_MS) {
-        boot_stable = boot_raw;
+    for (int i = 0; i < INPUT_BTN_COUNT; i++) {
+        ButtonState* b = &buttons[i];
+        bool raw = (b->bit == NO_BIT) ? digitalRead(BOOT_BTN_PIN) == LOW
+                                      : (p0 & (1 << b->bit)) == 0;
+        debounce(b, raw, now);
     }
 }
 
@@ -71,8 +61,7 @@ void input_hal_init(void) {
 }
 
 bool input_hal_is_held(InputButton btn) {
-    poll_buttons();
-    if (btn == INPUT_BTN_UI_NAV) return boot_stable;
     if (btn < 0 || btn >= INPUT_BTN_COUNT) return false;
-    return expander_buttons[btn].stable;
+    poll_buttons();
+    return buttons[btn].stable;
 }
