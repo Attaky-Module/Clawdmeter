@@ -1,3 +1,145 @@
+<div align="center">
+
+  <a href="https://attaky.com">
+    <img alt="Attaky" src="./.github/attaky-logo-horizontal.png" width="32%" />
+  </a>
+
+  <h2>Clawdmeter for the Attaky Modular Device</h2>
+
+  <p>
+    <img src="https://img.shields.io/badge/board-Attaky_Core_1.0-C0252B?style=flat-square" alt="Attaky Core 1.0" />
+    <img src="https://img.shields.io/badge/license-none_(see_notes)-lightgrey?style=flat-square" alt="License" />
+    <a href="https://discord.attaky.com"><img src="https://img.shields.io/badge/Discord-attaky-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord" /></a>
+  </p>
+
+  <a href="https://attaky.com">Attaky home</a>
+  &nbsp;·&nbsp;
+  <a href="https://discord.attaky.com">Discord</a>
+
+</div>
+
+> This repository is a fork of [Clawdmeter](https://github.com/HermannBjorgvin/Clawdmeter),
+> originally developed by [Hermann Björgvin Haraldsson](https://github.com/HermannBjorgvin),
+> last modified by Attaky on **2026-10-18** from upstream release **`v2.2.1`** (2026-10-17),
+> to add support for the **Attaky Modular Device**. Upstream is intentionally
+> unlicensed because of bundled copyrighted mascot assets — see the
+> [licensing notes](#licensing-gray-area-warning) below.
+
+A Claude Code usage dashboard for **Attaky Modular Device** hardware.
+It pairs with your computer over Bluetooth, shows your session and
+weekly limits, and Clawd lives on the screen: he reacts to prompts and
+alerts you when a session needs an answer. The physical keys double as
+a BLE HID keyboard for Claude Code shortcuts.
+
+|                 Usage                  |                 Pairing                  |
+| :------------------------------------: | :--------------------------------------: |
+| ![Usage](screenshots/attaky-usage.png) | ![Pairing](screenshots/attaky-pairing.png) |
+|     Session and weekly limits          |   Not paired yet: hold BOOT to pair      |
+
+## Compatible devices
+
+- **Attaky Core 1.0** — 320 × 240 landscape touchscreen, D-pad and
+  side keys. Connects to the host over USB-C for flashing and serial.
+- **Attaky Power_Standard-Cell_1.0** — Li-Po battery with on-board
+  fuel gauge that reports battery percentage to the firmware.
+- USB-C cable for flashing firmware and charging.
+
+## What this fork adds on top of Clawdmeter
+
+- **Attaky Core 1.0 build target** — a first-class board under
+  upstream's board HAL (`firmware/src/boards/attaky_core_esp32/` + the
+  `attaky_core_esp32` PlatformIO env); the meters layout, Clawd and the
+  BLE protocol are upstream's, unchanged
+- **D-pad + side keys as a BLE HID keyboard** — arrows, Enter,
+  Shift+Tab and Space (Claude Code mode toggle / push-to-talk)
+- **Battery fuel-gauge support** — battery percentage from the Power
+  cell module
+- **Pairing on BOOT** — Attaky Core's POWER long-hold is a hardware
+  power switch, so the clear-pairing gesture lives on BOOT
+- **Freely licensed UI typefaces** — Source Serif 4 + Archivo (SIL OFL
+  1.1) replace the proprietary brand fonts bundled upstream, on the
+  device and in the desktop app
+- **BLE name** — the device advertises as **"Attaky Claude Monitor"**;
+  the desktop app in this repository finds either name
+
+## Using this fork on Attaky Core
+
+Everything general — the desktop app, hooks, settings, the BLE
+protocol — is documented in the
+[upstream README below](#-upstream-clawdmeter-readme-). The Attaky
+deltas are:
+
+- **Firmware**: install the ready-made build from the Attaky firmware
+  store, or clone this repository and flash the Attaky env with
+  PlatformIO:
+  `pio run -d firmware -e attaky_core_esp32 -t upload --upload-port <port>`.
+  The board uses a USB-to-serial bridge, so the port is
+  `/dev/cu.usbserial-*` on macOS or `/dev/ttyUSB0` on Linux. The
+  desktop app's built-in flasher only lists native-USB boards and does
+  not offer Attaky Core.
+- **Desktop app**: build it from this repository
+  (`cd desktop && cargo run --release -p clawdmeter-app`). It knows
+  Attaky Core's BLE name, pairing gesture and board picture. The
+  upstream release app finds a board by its data service while
+  scanning, but some reconnect paths look for the name "Clawdmeter"
+  only.
+- **Pair** **"Attaky Claude Monitor"** in your computer's Bluetooth
+  settings (upstream's steps say "Clawdmeter").
+- **Clear the pairing** by holding **BOOT** for 3 seconds and
+  releasing (the on-device hint says so too). Upstream's "hold the
+  power button" does not apply here. Then *Forget* the device in your
+  OS Bluetooth settings before reconnecting.
+- **Keys** — they act as a BLE HID keyboard on whatever window has
+  focus:
+
+  | Key            | Function                                    |
+  | -------------- | ------------------------------------------- |
+  | **D-pad ↑↓←→** | Arrow keys                                  |
+  | **SELECT**     | Enter / confirm                             |
+  | **L1**         | Shift+Tab (Claude Code mode toggle)         |
+  | **R2**         | Space (Claude Code voice-mode push-to-talk) |
+  | **BOOT**       | Wake the screen · hold 3 s + release: clear the pairing |
+  | **POWER**      | Short: cycle brightness · long hold: hardware power switch |
+
+- **Battery**: the Power cell reports charge but not whether USB is
+  plugged in, so on USB with a full battery the screen may dim to
+  sleep as it does on battery; any key wakes it.
+
+## Credits
+
+- Original Clawdmeter by @hermannbjorgvin and its contributors.
+- Attaky Core 1.0 hardware adaptation by the Attaky project.
+- macOS host pieces in earlier versions of this fork by
+  Chris Davidson (@lorddavidson).
+- UI typefaces: Source Serif 4 (Adobe, SIL OFL 1.1), Archivo
+  (Omnibus-Type, SIL OFL 1.1) and DejaVu Sans Mono (Bitstream Vera
+  license). OFL license texts ship in `assets/`.
+
+## Licensing gray area warning
+
+Unlike upstream, this fork does NOT bundle Anthropic's proprietary
+brand fonts — the device UI and the desktop app were rebuilt on the
+freely licensed typefaces listed above. The remaining gray area is the
+Clawd mascot artwork. The original author's statement is preserved in
+the upstream README below; for this fork the font half of that warning
+no longer applies, while the copyrighted Clawd mascot assets are still
+included as-is and are not relicensed.
+
+## Support
+
+- **Attaky Modular Device / this fork** — Attaky [Discord](https://discord.attaky.com)
+- **Clawdmeter concept / upstream firmware** — file at
+  [`HermannBjorgvin/Clawdmeter`](https://github.com/HermannBjorgvin/Clawdmeter/issues)
+
+---
+
+# ↓ Upstream Clawdmeter README ↓
+
+*Preserved from upstream release `v2.2.1` (2026-10-17) for attribution
+and reference, with the Attaky Core row added to the board table. The
+install and quick-start steps describe the upstream app release and
+the upstream boards; for Attaky Core see the section above.*
+
 # Clawdmeter
 
 ![Two Clawdmeter devices: Clawd's face on the left, session and weekly usage on the right](docs/images/clawdmeter-hero.jpg)
@@ -54,6 +196,7 @@ Stable.
 | <img src="desktop/crates/clawdmeter-app/assets/boards/freenove_s3_display_nontouch.svg" height="90" alt=""> | [Freenove ESP32-S3 Display 2.8 inch (non-touch, FNK0104A)](https://store.freenove.com/products/fnk0104) | 240×320 IPS, no touch. Minimal UI: meters and a still Clawd; BOOT: brightness, hold to pair. |
 | <img src="desktop/crates/clawdmeter-app/assets/boards/sensecap_indicator_d1l.svg" height="90" alt=""> | [Seeed Studio SenseCAP Indicator D1L](https://www.seeedstudio.com/SenseCAP-Indicator-D1L-p-5646.html) | 480×480 RGB touch screen. Side button: brightness / hold to pair; no HID buttons or sound. |
 | <img src="desktop/crates/clawdmeter-app/assets/boards/spotpear_s3_154.svg" height="90" alt=""> | [SpotPear ESP32-S3-LCD-1.54 MUMA (touch)](https://spotpear.com/shop/ESP32-S3-AI-1.54-inch-LCD-Display-TouchScreen-N16R8-muma-DeepSeek.html) | 240×240 ST7789 SPI LCD, CST816 touch, no PMU. BOOT is the only button. |
+| <img src="desktop/crates/clawdmeter-app/assets/boards/attaky_core_esp32.svg" height="90" alt=""> | [Attaky Core ESP32](https://shop.attaky.com) | 320×240 touch TFT, D-pad + keys as a BLE keyboard, Power cell battery. Hold BOOT 3 s to clear the pairing (POWER is a hardware power switch). Env `attaky_core_esp32`. |
 
 ## Install
 
